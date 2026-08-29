@@ -29,15 +29,15 @@ do
         RageLeft = Pages.Rage:Section({Name = 'rage', Side = 1}),
         RageAntiAim = Pages.Rage:Section({Name = 'anti aim', Side = 1}),
         RageRight = Pages.Rage:Section({Name = 'players', Side = 2}),
-        
+        RageTarget = Pages.Rage:Section({Name = 'target', Side = 2}),
         WeaponsLeft = Pages.Weapons:Section({Name = 'guns', Side = 1}),
         WeaponsRight = Pages.Weapons:Section({Name = 'spread', Side = 2}),
         WorldLeft = Pages.World:Section({Name = 'view', Side = 1}),
         WorldRight = Pages.World:Section({Name = 'world', Side = 2}),
-        
-        
-        
-        SelfStim = Pages.Self:Section({Name = 'auto stim', Side = 1}),
+        SelfLeft = Pages.Self:Section({Name = 'health', Side = 1}),
+        SelfRight = Pages.Self:Section({Name = 'size', Side = 2}),
+        SelfSentry = Pages.Self:Section({Name = 'sentry', Side = 1}),
+        SelfStim = Pages.Self:Section({Name = 'auto stim', Side = 2}),
         MovementLeft = Pages.Movement:Section({Name = 'self', Side = 1}),
         MovementRight = Pages.Movement:Section({Name = 'other', Side = 2})
     }
@@ -374,221 +374,13 @@ do
     Sections.RageLeft:Toggle({Name = 'magic bullet', Flag = 'rage_magic_bullet', Default = false})
     Sections.RageLeft:Slider({Name = 'magic fov', Flag = 'hitbox_size', Default = 1, Min = 0, Max = 20, Decimals = 1})
     
-    local desync = {
-    enabled = false,
-    mode = "Destroy Cheaters",
-    old_position = nil,
-    teleportPosition = Vector3.new(99999999, 1, 1),
-    connection = nil,
-    cameraSubject = nil
-}
-
--- Get character and root part
-local function getChar()
-    return LP.Character
-end
-
-local function getRoot()
-    local char = getChar()
-    if not char then return nil end
-    return char:FindFirstChild("HumanoidRootPart")
-end
-
-local function getHumanoid()
-    local char = getChar()
-    if not char then return nil end
-    return char:FindFirstChildOfClass("Humanoid")
-end
-
--- Reset camera to local player
-local function resetCamera()
-    local hum = getHumanoid()
-    if hum then
-        Workspace.CurrentCamera.CameraSubject = hum
-    end
-end
-
--- Save camera subject and set to void position
-local function setCameraToVoid()
-    local hum = getHumanoid()
-    if hum then
-        desync.cameraSubject = hum
-        Workspace.CurrentCamera.CameraSubject = hum
-    end
-end
-
--- Desync loop
-local function startDesync()
-    if desync.connection then return end
-    
-    -- Save the camera subject before we start
-    setCameraToVoid()
-    
-    desync.connection = RunService.Heartbeat:Connect(function()
-        if not desync.enabled then return end
-        
-        local root = getRoot()
-        if not root then return end
-        
-        -- Save old position
-        desync.old_position = root.CFrame
-        
-        -- Teleport character to void
-        root.CFrame = CFrame.new(desync.teleportPosition)
-        
-        -- Keep camera on the void position (spoof)
-        local hum = getHumanoid()
-        if hum then
-            Workspace.CurrentCamera.CameraSubject = hum
-        end
-    end)
-end
-
-local function stopDesync()
-    if desync.connection then
-        desync.connection:Disconnect()
-        desync.connection = nil
-    end
-    
-    -- Reset camera back to local player
-    resetCamera()
-    
-    -- Teleport back to saved position
-    if desync.old_position then
-        local root = getRoot()
-        if root then
-            root.CFrame = desync.old_position
-        end
-    end
-end
-
--- Toggle desync on/off
-local function toggleDesync()
-    desync.enabled = not desync.enabled
-    
-    if desync.enabled then
-        startDesync()
-    else
-        stopDesync()
-    end
-end
-
--- CSync toggle (separate from void hide)
-local csync = {
-    enabled = false,
-    connection = nil
-}
-
-local function startCsync()
-    if csync.connection then return end
-    
-    csync.connection = RunService.Heartbeat:Connect(function()
-        if not csync.enabled then return end
-        
-        local root = getRoot()
-        if not root then return end
-        
-        -- Teleport character to void
-        root.CFrame = CFrame.new(desync.teleportPosition)
-        
-        -- Keep camera on the local player
-        local hum = getHumanoid()
-        if hum then
-            Workspace.CurrentCamera.CameraSubject = hum
-        end
-    end)
-end
-
-local function stopCsync()
-    if csync.connection then
-        csync.connection:Disconnect()
-        csync.connection = nil
-    end
-    
-    -- Reset camera
-    resetCamera()
-    
-    -- Teleport back to saved position
-    if desync.old_position then
-        local root = getRoot()
-        if root then
-            root.CFrame = desync.old_position
-        end
-    end
-end
-
-local function toggleCsync()
-    csync.enabled = not csync.enabled
-    
-    if csync.enabled then
-        -- Stop desync if it's running
-        if desync.enabled then
-            desync.enabled = false
-            stopDesync()
-        end
-        startCsync()
-    else
-        stopCsync()
-    end
-end
-
--- Override the toggle to handle both
-local originalToggle = toggleDesync
-toggleDesync = function()
-    if csync.enabled then
-        csync.enabled = false
-        stopCsync()
-    end
-    originalToggle()
-end
-
--- Toggle functions for UI
-local function toggleVoidHide()
-    if csync.enabled then
-        csync.enabled = false
-        stopCsync()
-    end
-    toggleDesync()
-end
-
-local function toggleCsyncOnly()
-    if desync.enabled then
-        desync.enabled = false
-        stopDesync()
-    end
-    toggleCsync()
-end
-
--- UI Toggles
-Sections.RageAntiAim:Toggle({
-    Name = 'void hide', 
-    Flag = 'rage_void_hide', 
-    Default = false,
-    Callback = function(value)
-        if value then
-            toggleVoidHide()
-        else
-            if desync.enabled then
-                toggleDesync()
-            end
-        end
-    end
-})
-
-Sections.RageAntiAim:Toggle({
-    Name = 'desync', 
-    Flag = 'rage_desync', 
-    Default = false,
-    Callback = function(value)
-        if value then
-            toggleCsyncOnly()
-        else
-            if csync.enabled then
-                toggleCsync()
-            end
-        end
-    end
-})
+    Sections.RageAntiAim:Toggle({Name = 'void hide', Flag = 'rage_void_hide', Default = false})
+    Sections.RageAntiAim:Toggle({Name = 'desync', Flag = 'rage_desync', Default = false})
+    Sections.RageAntiAim:Slider({Name = 'void depth', Flag = 'void_depth', Default = 1000000, Min = 50000, Max = 10000000, Decimals = 1})
+    Sections.RageAntiAim:Slider({Name = 'jitter x', Flag = 'jitter_x', Default = 50, Min = 0, Max = 500, Decimals = 1})
+    Sections.RageAntiAim:Slider({Name = 'jitter y', Flag = 'jitter_y', Default = 25, Min = 0, Max = 500, Decimals = 1})
+    Sections.RageAntiAim:Slider({Name = 'jitter z', Flag = 'jitter_z', Default = 50, Min = 0, Max = 500, Decimals = 1})
+    Sections.RageAntiAim:Slider({Name = 'jitter speed', Flag = 'jitter_speed', Default = 20, Min = 1, Max = 100, Decimals = 1})
     
     -- ============================================
     -- WEAPONS - GUN DATA (ONCE)
@@ -725,65 +517,24 @@ end
     
     
 -- ============================================
--- WEAPONS TAB - INF RANGE, RAPID FIRE, REMOVE DELAY (FIXED)
+-- WEAPONS TAB - CLEAN WORKING VERSION (WITH GUN FILTER)
 -- ============================================
 
--- Gun Data (NO DOUBLE BARREL)
-local GunData = {
-    ["Revolver"] = {
-        ToolName = "[Revolver]",
-        Offset = CFrame.new(-1, 0.4, 0),
-        UseHandler = true,
-    },
-    ["Tactical SG"] = {
-        ToolName = "[TacticalShotgun]",
-        Offset = CFrame.new(0, 0.25, -2.5),
-        IsShotgun = true,
-        Pellets = 5,
-    },
-}
-
--- State
-local SelectedGuns = {}
-local InfRangeEnabled = false
-local PatchedGuns = {}
-local MonitorConnections = {}
-local RapidFireEnabled = false
-local RapidFireTools = {}
-local RemoveDelayEnabled = false
-local RemoveDelayTools = {}
-local RemoveDelayHold = false
-local RemoveDelayHoldDelay = 0.075
-local RemoveDelayHoldActive = false
-local RemoveDelayHoldConnection = nil
-local RemoveDelayMouseDownConnection = nil
-local RemoveDelayMouseUpConnection = nil
-
 -- ========================== SPREAD SYSTEM ==========================
-local settings = { 
-    BulletSpread = { 
-        Enabled = false, 
-        Amount = 0 
-    } 
-}
+local spreadSettings = { enabled = false, amount = 0 }
 
-local originalRandom
-originalRandom = hookfunction(math.random, function(...)
+local origRand
+origRand = hookfunction(math.random, function(...)
     local args = { ... }
-    if checkcaller() then return originalRandom(...) end
-    if (#args == 0) or 
-       (args[1] == -0.05 and args[2] == 0.05) or 
-       (args[1] == -0.1) or 
-       (args[1] == -0.05) then
-        if settings.BulletSpread.Enabled then
-            return originalRandom(...) * (settings.BulletSpread.Amount / 100)
+    if checkcaller() then return origRand(...) end
+    if (#args == 0) or (args[1] == -0.05 and args[2] == 0.05) or (args[1] == -0.1) or (args[1] == -0.05) then
+        if spreadSettings.enabled then
+            return origRand(...) * (spreadSettings.amount / 100)
         end
     end
-    return originalRandom(...)
+    return origRand(...)
 end)
--- ===================================================================
 
--- Spread UI
 Sections.WeaponsRight:Dropdown({
     Name = "Spread Guns",
     Flag = "spread_gun_selector",
@@ -796,650 +547,631 @@ Sections.WeaponsRight:Toggle({
     Name = "adjust spread",
     Flag = "adjust_spread",
     Default = false,
-    Callback = function(value)
-        settings.BulletSpread.Enabled = value
-    end,
+    Callback = function(v) spreadSettings.enabled = v end,
 })
 
 Sections.WeaponsRight:Slider({
     Name = "spread amount",
     Flag = "spread_amount",
-    Min = 1,
-    Max = 100,
-    Default = 1,
-    Callback = function(value)
-        settings.BulletSpread.Amount = value
-    end,
+    Min = 1, Max = 100, Default = 1,
+    Callback = function(v) spreadSettings.amount = v end,
 })
 
 -- ============================================
--- INF RANGE FUNCTIONS (FIXED - PERSISTENT)
+-- GUN NAME MAPPING
 -- ============================================
 
--- Find the main remote properly
-local function findMainRemote()
-    local gameRemotes = G.RS:FindFirstChild("GameRemotes")
-    if gameRemotes then
-        local main = gameRemotes:FindFirstChild("MainGameEvent")
-        if main and main:IsA("RemoteEvent") then return main end
-    end
-    -- Fallback: search all descendants
-    for _, obj in ipairs(G.RS:GetDescendants()) do
-        if obj:IsA("RemoteEvent") and (obj.Name:lower():find("main",1,true) or obj.Name:lower():find("game",1,true)) then
-            return obj
-        end
-    end
-    return nil
-end
-
-local MainRemote = findMainRemote()
-
-local function CleanupGun(gun)
-    local data = PatchedGuns[gun]
-    if not data then return end
-    for _, c in ipairs(data.Connections) do
-        pcall(function() c:Disconnect() end)
-    end
-    if data.OriginalValues then
-        for propName, propValue in pairs(data.OriginalValues) do
-            local prop = gun:FindFirstChild(propName)
-            if prop then
-                pcall(function() prop.Value = propValue end)
-            end
-        end
-    end
-    local ourEvent = gun:FindFirstChild("Activated")
-    if ourEvent and data.OurActivated then
-        pcall(function() ourEvent:Destroy() end)
-    end
-    local originalEvent = gun:FindFirstChild("_OriginalActivated")
-    if originalEvent then
-        pcall(function() originalEvent.Name = "Activated" end)
-    end
-    if data.OriginalActivatedProp ~= nil then
-        pcall(function() gun.Activated = data.OriginalActivatedProp end)
-    end
-    PatchedGuns[gun] = nil
-end
-
-local function PatchProperties(gun, storage)
-    local props = {"Range", "Damage"}
-    storage.OriginalValues = {}
-    for _, propName in ipairs(props) do
-        local prop = gun:FindFirstChild(propName)
-        if not prop then
-            prop = Instance.new("NumberValue")
-            prop.Name = propName
-            prop.Parent = gun
-            storage.OriginalValues[propName] = 0
-        else
-            storage.OriginalValues[propName] = prop.Value
-        end
-        if propName == "Range" then prop.Value = 9999999 end
-        if propName == "Damage" then prop.Value = 9999 end
-    end
-end
-
--- SIMPLIFIED INF RANGE - NO GUNHANDLER TO PREVENT KICKS
-local function PatchRevolver(gun)
-    if PatchedGuns[gun] then return end
-    local store = {Connections = {}, OriginalValues = {}}
-    PatchedGuns[gun] = store
-    PatchProperties(gun, store)
-    local oldActivated = gun:FindFirstChild("Activated")
-    if oldActivated then
-        oldActivated.Name = "_OriginalActivated"
-        store.OriginalActivated = oldActivated
-    end
-    local newActivated = Instance.new("BindableEvent")
-    newActivated.Name = "Activated"
-    newActivated.Parent = gun
-    store.OurActivated = newActivated
-    local conn = newActivated.Event:Connect(function()
-        if not InfRangeEnabled then
-            local orig = gun:FindFirstChild("_OriginalActivated")
-            if orig then pcall(function() orig:Fire() end) end
-            return
-        end
-        local handle = gun:FindFirstChild("Handle")
-        local char = G.LP.Character
-        local head = char and char:FindFirstChild("Head")
-        if not (handle and head) then return end
-        local handlePos = (handle.CFrame * GunData["Revolver"].Offset).Position
-        local aimPos = handlePos + head.CFrame.LookVector * 9999999
-        local muzzle = gun:FindFirstChild("Default")
-            and gun.Default:FindFirstChild("Mesh")
-            and gun.Default.Mesh:FindFirstChild("Muzzle")
-        local origin = muzzle and muzzle.WorldPosition or handlePos
-        
-        -- Use MainRemote if available, otherwise find it
-        local remote = MainRemote
-        if not remote then
-            remote = findMainRemote()
-            MainRemote = remote
-        end
-        if not remote then return end
-        
-        -- SIMPLIFIED - just fire the remote directly
-        pcall(function()
-            remote:FireServer("ShootGun", handle, origin, nil, nil, nil, nil, 9999999, 9999)
-        end)
-    end)
-    table.insert(store.Connections, conn)
-    table.insert(store.Connections, gun.AncestryChanged:Connect(function()
-        if not gun.Parent then CleanupGun(gun) end
-    end))
-end
-
-local function PatchTacticalShotgun(gun)
-    if PatchedGuns[gun] then return end
-    local store = {Connections = {}, OriginalValues = {}}
-    PatchedGuns[gun] = store
-    PatchProperties(gun, store)
-    local oldActivated = gun:FindFirstChild("Activated")
-    if oldActivated then
-        oldActivated.Name = "_OriginalActivated"
-        store.OriginalActivated = oldActivated
-    end
-    local newActivated = Instance.new("BindableEvent")
-    newActivated.Name = "Activated"
-    newActivated.Parent = gun
-    store.OurActivated = newActivated
-    local conn = newActivated.Event:Connect(function()
-        if not InfRangeEnabled then
-            local orig = gun:FindFirstChild("_OriginalActivated")
-            if orig then pcall(function() orig:Fire() end) end
-            return
-        end
-        local handle = gun:FindFirstChild("Handle")
-        local char = G.LP.Character
-        local head = char and char:FindFirstChild("Head")
-        if not (handle and head) then return end
-        local handlePos = (handle.CFrame * GunData["Tactical SG"].Offset).Position
-        local aimPos = handlePos + head.CFrame.LookVector * 9999999
-        local muzzle = gun:FindFirstChild("Default")
-            and gun.Default:FindFirstChild("Mesh")
-            and gun.Default.Mesh:FindFirstChild("Muzzle")
-        local origin = muzzle and muzzle.WorldPosition or handlePos
-        local shots = {}
-        for i = 1, 5 do
-            table.insert(shots, {
-                AimPosition = aimPos,
-                Result1 = nil,
-                Result2 = nil,
-                Result3 = nil,
-            })
-        end
-        
-        local remote = MainRemote
-        if not remote then
-            remote = findMainRemote()
-            MainRemote = remote
-        end
-        if not remote then return end
-        
-        pcall(function()
-            remote:FireServer("ShootGun", handle, origin, shots, nil, nil, nil, 9999999, 9999)
-        end)
-    end)
-    table.insert(store.Connections, conn)
-    table.insert(store.Connections, gun.AncestryChanged:Connect(function()
-        if not gun.Parent then CleanupGun(gun) end
-    end))
-end
-
-local Patchers = {
-    ["Revolver"] = PatchRevolver,
-    ["Tactical SG"] = PatchTacticalShotgun,
+local GUN_TOOL_NAMES = {
+    ["Revolver"] = "[Revolver]",
+    ["Tactical SG"] = "[TacticalShotgun]",
+    ["Double Barrel"] = "[Double-Barrel SG]",
 }
 
--- ============================================
--- PATCH GUN IMMEDIATELY (NO DELAY)
--- ============================================
-local function PatchGunIfEquipped(gun)
-    if not gun then return end
-    if not InfRangeEnabled then return end
-    if gun.Parent ~= G.LP.Character then return end
-    if PatchedGuns[gun] then return end
-    
-    for gunName, gData in pairs(GunData) do
-        if gun.Name == gData.ToolName then
-            if Patchers[gunName] then
-                pcall(function() Patchers[gunName](gun) end)
-            end
-            break
-        end
-    end
-end
+local selectedGuns = {"Revolver", "Tactical SG", "Double Barrel"}
+local currentSelected = {"Revolver"}
 
-local function CheckEquippedGun()
-    if not InfRangeEnabled then return end
-    local char = G.LP.Character
-    if not char then return end
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool then
-        PatchGunIfEquipped(tool)
-    end
-end
-
-local function ScanAndPatch()
-    if not InfRangeEnabled then return end
-    local char = G.LP.Character
-    if not char then return end
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool then
-        PatchGunIfEquipped(tool)
-    end
-end
-
--- ============================================
--- RAPID FIRE FUNCTIONS
--- ============================================
-
-local function IsGunSelected(tool)
-    if not SelectedGuns or #SelectedGuns == 0 then return false end
-    for _, name in ipairs(SelectedGuns) do
-        if GunData[name] and tool.Name == GunData[name].ToolName then
+local function isGunSelected(tool)
+    if not tool or not currentSelected or #currentSelected == 0 then return false end
+    for _, name in ipairs(currentSelected) do
+        if GUN_TOOL_NAMES[name] and tool.Name == GUN_TOOL_NAMES[name] then
             return true
         end
     end
     return false
 end
 
-local function SetupRapidFire(tool)
-    if not tool or not tool.Parent then return end
-    if RapidFireTools[tool] then return end
-    if tool.Parent ~= G.LP.Character then return end
-    if not tool:FindFirstChild("GunScript") then return end
+-- ============================================
+-- RANGE EXPANDER (STANDALONE)
+-- ============================================
+
+local rangeOn = false
+local rangeValue = 999999
+
+local _grm = getrawmetatable(game)
+local _oldIndex = _grm.__index
+setreadonly(_grm, false)
+
+_grm.__index = function(self, key)
+    if not checkcaller() and self == G.LP:GetMouse() then
+        if rangeOn and key == "Hit" then
+            local unitRay = _oldIndex(self, "UnitRay")
+            if unitRay then
+                local origin = unitRay.Origin
+                local params = RaycastParams.new()
+                params.FilterType = Enum.RaycastFilterType.Exclude
+                params.FilterDescendantsInstances = { G.LP.Character }
+                local res = G.W:Raycast(origin, unitRay.Direction * rangeValue, params)
+                local hitPos = res and res.Position or (origin + unitRay.Direction * rangeValue)
+                return CFrame.new(hitPos)
+            end
+        end
+    end
+    return _oldIndex(self, key)
+end
+setreadonly(_grm, true)
+
+local gunHandlerPatched = false
+local function patchGunHandler()
+    if gunHandlerPatched then return end
+    task.spawn(function()
+        local modules = G.RS:FindFirstChild("Modules")
+        if not modules then modules = G.RS:WaitForChild("Modules", 10) end
+        if not modules then return end
+        local gunhandler = modules:FindFirstChild("GunHandler")
+        if not gunhandler then gunhandler = modules:WaitForChild("GunHandler", 10) end
+        if not gunhandler then return end
+        local ok, handler = pcall(require, gunhandler)
+        if not ok or type(handler) ~= "table" then return end
+
+        local function patchShoot(original)
+            if type(original) ~= "function" then return original end
+            return function(t, ...)
+                if type(t) == "table" and rangeOn then
+                    t.Range = rangeValue
+                    if t.range then t.range = rangeValue end
+                end
+                return original(t, ...)
+            end
+        end
+
+        if handler.Shoot then handler.Shoot = patchShoot(handler.Shoot) end
+        if handler.shoot then handler.shoot = patchShoot(handler.shoot) end
+        gunHandlerPatched = true
+    end)
+end
+
+-- ============================================
+-- RAPID FIRE (SINGLE SYSTEM - FILTERED)
+-- ============================================
+
+local rapidOn = false
+local rapidGuns = {} -- tool -> true
+
+local function setupRapid(gun)
+    if rapidGuns[gun] then return end
+    if gun.Parent ~= G.LP.Character then return end
+    if not isGunSelected(gun) then return end  -- <-- FILTER
     
-    local connections = getconnections(tool.Activated)
-    for _, conn in ipairs(connections) do
-        local func = conn.Function
-        if func then
-            local info = debug.getinfo(func)
+    local conns = getconnections(gun.Activated)
+    for _, c in ipairs(conns) do
+        local fn = c.Function
+        if fn then
+            local info = debug.getinfo(fn)
             for i = 1, (info.nups or 0) do
-                local val = debug.getupvalue(func, i)
+                local val = debug.getupvalue(fn, i)
                 if type(val) == "number" and val > 0 and val < 0.5 then
-                    debug.setupvalue(func, i, 0)
+                    debug.setupvalue(fn, i, 0)
                 end
             end
         end
     end
-    RapidFireTools[tool] = true
+    rapidGuns[gun] = true
 end
 
-local function CleanupRapidFire(tool)
-    RapidFireTools[tool] = nil
+local function clearRapidGuns()
+    rapidGuns = {}
 end
 
-local function ScanAndPatchRapidFire()
-    if not RapidFireEnabled then return end
+local function scanRapid()
+    if not rapidOn then return end
     local char = G.LP.Character
     if not char then return end
-    local equipped = char:FindFirstChildOfClass("Tool")
-    if equipped and IsGunSelected(equipped) then
-        SetupRapidFire(equipped)
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool and tool:FindFirstChild("Ammo") and isGunSelected(tool) then  -- <-- FILTER
+        if not rapidGuns[tool] then setupRapid(tool) end
+        if G.U:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            pcall(tool.Activate, tool)
+        end
     end
 end
 
--- INF AMMO (RELIABLE - WORKS WITH RAPID FIRE)
-local _infAmmoConn = nil
-
-
-
 -- ============================================
--- REMOVE DELAY FUNCTIONS (FIXED - 1 BULLET AT A TIME)
+-- REMOVE DELAY + HOLD MODE (FILTERED)
 -- ============================================
 
-local function SetupRemoveDelay(tool)
-    if not tool or not tool.Parent then return end
-    if RemoveDelayTools[tool] then return end
-    if tool.Parent ~= G.LP.Character then return end
+local delayOn = false
+local delayGuns = {}
+local holdActive = false
+local holdConn = nil
+local mouseDownConn = nil
+local mouseUpConn = nil
+local holdDelay = 0.05
+local lastFireTime = 0
+
+local function setupDelay(gun)
+    if delayGuns[gun] then return end
+    if gun.Parent ~= G.LP.Character then return end
+    if not isGunSelected(gun) then return end  -- <-- FILTER
     
-    local gunScript = tool:FindFirstChild("GunScript")
-    local fireRate = tool:FindFirstChild("FireRate") or tool:FindFirstChild("Rate") or tool:FindFirstChild("ShootRate")
-    local cooldown = tool:FindFirstChild("ShootingCooldown")
+    local gs = gun:FindFirstChild("GunScript")
+    local fr = gun:FindFirstChild("FireRate") or gun:FindFirstChild("Rate") or gun:FindFirstChild("ShootRate")
+    local cd = gun:FindFirstChild("ShootingCooldown")
     
-    if gunScript then
-        local connections = getconnections(tool.Activated)
-        for _, conn in ipairs(connections) do
-            local func = conn.Function
-            if func then
-                local info = debug.getinfo(func)
+    if gs then
+        local conns = getconnections(gun.Activated)
+        for _, c in ipairs(conns) do
+            local fn = c.Function
+            if fn then
+                local info = debug.getinfo(fn)
                 for i = 1, (info.nups or 0) do
-                    local val = debug.getupvalue(func, i)
+                    local val = debug.getupvalue(fn, i)
                     if type(val) == "number" and val > 0.05 and val < 1 then
-                        debug.setupvalue(func, i, 0)
+                        debug.setupvalue(fn, i, 0)
                     end
                 end
             end
         end
     end
+    if fr and fr:IsA("NumberValue") then fr.Value = 0 end
+    if cd and cd:IsA("NumberValue") then cd.Value = 0 end
     
-    if fireRate and fireRate:IsA("NumberValue") then
-        fireRate.Value = 0
-    end
-    
-    if cooldown and cooldown:IsA("NumberValue") then
-        cooldown.Value = 0
-    end
-    
-    RemoveDelayTools[tool] = true
+    delayGuns[gun] = true
 end
 
-local function CleanupRemoveDelay(tool)
-    RemoveDelayTools[tool] = nil
+local function clearDelayGuns()
+    delayGuns = {}
 end
 
-local function ScanAndPatchRemoveDelay()
-    if not RemoveDelayEnabled then return end
-    local char = G.LP.Character
-    if not char then return end
-    local equipped = char:FindFirstChildOfClass("Tool")
-    if equipped and IsGunSelected(equipped) then
-        SetupRemoveDelay(equipped)
-    end
-end
-
--- ============================================
--- HOLD MODE (FIXED - 1 BULLET AT A TIME)
--- ============================================
-local function StartHoldMode()
-    if RemoveDelayHoldConnection then return end
+local function startHoldMode()
+    if holdConn then return end
     
-    RemoveDelayMouseDownConnection = G.U.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
+    mouseDownConn = G.U.InputBegan:Connect(function(input, gp)
+        if gp then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            if not RemoveDelayEnabled then return end
-            
+            if not delayOn then return end
             local char = G.LP.Character
             if not char then return end
             local tool = char:FindFirstChildOfClass("Tool")
-            if not tool or not IsGunSelected(tool) then return end
+            if not tool or not tool:FindFirstChild("Ammo") then return end
+            if not isGunSelected(tool) then return end  -- <-- FILTER
             
-            if not RemoveDelayTools[tool] then
-                SetupRemoveDelay(tool)
-            end
+            if not delayGuns[tool] then setupDelay(tool) end
+            holdActive = true
+            lastFireTime = 0
             
-            RemoveDelayHoldActive = true
+            if holdConn then holdConn:Disconnect() holdConn = nil end
             
-            if RemoveDelayHoldConnection then
-                RemoveDelayHoldConnection:Disconnect()
-                RemoveDelayHoldConnection = nil
-            end
-            
-            local delay = RemoveDelayHoldDelay
-            local lastFire = 0
-            
-            -- Fire immediately on click (1 bullet)
-            pcall(function() tool:Activate() end)
-            lastFire = tick()
-            
-            RemoveDelayHoldConnection = G.R.Heartbeat:Connect(function()
-                if not RemoveDelayHoldActive then
-                    if RemoveDelayHoldConnection then
-                        RemoveDelayHoldConnection:Disconnect()
-                        RemoveDelayHoldConnection = nil
-                    end
+            holdConn = G.R.Heartbeat:Connect(function()
+                if not holdActive or not delayOn then
+                    if holdConn then holdConn:Disconnect() holdConn = nil end
                     return
                 end
-                
                 local char2 = G.LP.Character
-                if not char2 then
-                    RemoveDelayHoldActive = false
-                    return
-                end
-                
+                if not char2 then holdActive = false return end
                 local tool2 = char2:FindFirstChildOfClass("Tool")
-                if not tool2 or not IsGunSelected(tool2) then
-                    RemoveDelayHoldActive = false
+                if not tool2 or not tool2:FindFirstChild("Ammo") then holdActive = false return end
+                if not isGunSelected(tool2) then  -- <-- FILTER
+                    holdActive = false
                     return
                 end
                 
-                -- Only fire 1 bullet if enough time has passed
                 local now = tick()
-                if now - lastFire >= delay then
-                    pcall(function() tool2:Activate() end) -- THIS FIRES 1 BULLET
-                    lastFire = now
+                if now - lastFireTime >= holdDelay then
+                    pcall(tool2.Activate, tool2)
+                    lastFireTime = now
                 end
             end)
         end
     end)
     
-    RemoveDelayMouseUpConnection = G.U.InputEnded:Connect(function(input)
+    mouseUpConn = G.U.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            RemoveDelayHoldActive = false
-            if RemoveDelayHoldConnection then
-                RemoveDelayHoldConnection:Disconnect()
-                RemoveDelayHoldConnection = nil
-            end
+            holdActive = false
+            if holdConn then holdConn:Disconnect() holdConn = nil end
         end
     end)
 end
 
-local function StopHoldMode()
-    RemoveDelayHoldActive = false
-    
-    if RemoveDelayHoldConnection then
-        RemoveDelayHoldConnection:Disconnect()
-        RemoveDelayHoldConnection = nil
-    end
-    
-    if RemoveDelayMouseDownConnection then
-        RemoveDelayMouseDownConnection:Disconnect()
-        RemoveDelayMouseDownConnection = nil
-    end
-    
-    if RemoveDelayMouseUpConnection then
-        RemoveDelayMouseUpConnection:Disconnect()
-        RemoveDelayMouseUpConnection = nil
-    end
+local function stopHoldMode()
+    holdActive = false
+    if holdConn then holdConn:Disconnect() holdConn = nil end
+    if mouseDownConn then mouseDownConn:Disconnect() mouseDownConn = nil end
+    if mouseUpConn then mouseUpConn:Disconnect() mouseUpConn = nil end
 end
 
-local function RefreshHoldMode()
-    StopHoldMode()
-    if RemoveDelayHold and RemoveDelayEnabled then
-        StartHoldMode()
-    end
-end
-
--- ============================================
--- CLEANUP ALL ON DEATH/RESPAWN
--- ============================================
-local function CleanupAllWeaponMods()
-    -- Cleanup Inf Range
-    for gun, _ in pairs(PatchedGuns) do
-        CleanupGun(gun)
-    end
-    
-    -- Cleanup Rapid Fire
-    for tool, _ in pairs(RapidFireTools) do
-        CleanupRapidFire(tool)
-    end
-    RapidFireTools = {}
-    
-    -- Cleanup Remove Delay
-    for tool, _ in pairs(RemoveDelayTools) do
-        CleanupRemoveDelay(tool)
-    end
-    RemoveDelayTools = {}
-    
-    -- Stop Hold Mode
-    StopHoldMode()
-end
-
--- ============================================
--- RENDER LOOPS (FIXED - SCANS EVERY FRAME)
--- ============================================
-
-G.R.RenderStepped:Connect(function()
-    if InfRangeEnabled then
-        -- Check every frame for new gun
-        local char = G.LP.Character
-        if char then
-            local tool = char:FindFirstChildOfClass("Tool")
-            if tool then
-                -- Check if this gun needs patching
-                local needsPatch = false
-                for gunName, gData in pairs(GunData) do
-                    if tool.Name == gData.ToolName and Patchers[gunName] then
-                        if not PatchedGuns[tool] then
-                            needsPatch = true
-                        end
-                        break
-                    end
-                end
-                if needsPatch then
-                    PatchGunIfEquipped(tool)
-                end
-            end
-        end
-    end
-end)
-
-G.R.RenderStepped:Connect(function()
-    if not RapidFireEnabled then return end
+local function scanDelay()
+    if not delayOn then return end
     local char = G.LP.Character
     if not char then return end
     local tool = char:FindFirstChildOfClass("Tool")
-    if tool and IsGunSelected(tool) then
-        if not RapidFireTools[tool] then
-            SetupRapidFire(tool)
-        end
-        if G.U:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-            tool:Activate()
-        end
+    if tool and tool:FindFirstChild("Ammo") and isGunSelected(tool) then  -- <-- FILTER
+        if not delayGuns[tool] then setupDelay(tool) end
     end
-end)
+end
+
+-- ============================================
+-- RENDER LOOP
+-- ============================================
 
 G.R.RenderStepped:Connect(function()
-    if not RemoveDelayEnabled then return end
-    local char = G.LP.Character
-    if not char then return end
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool and IsGunSelected(tool) then
-        if not RemoveDelayTools[tool] then
-            SetupRemoveDelay(tool)
-        end
-    end
+    scanRapid()
+    scanDelay()
 end)
 
 -- ============================================
 -- CHARACTER EVENTS
 -- ============================================
+
+G.LP.CharacterAdded:Connect(function()
+    clearRapidGuns()
+    clearDelayGuns()
+    holdActive = false
+    if holdConn then holdConn:Disconnect() holdConn = nil end
+    if rangeOn then patchGunHandler() end
+    task.wait(0.3)
+    if delayOn and f.hold_mode then startHoldMode() end
+end)
+
 if G.LP.Character then
     G.LP.Character.ChildAdded:Connect(function(child)
         if child:IsA("Tool") then
-            -- Wait for tool to be fully equipped
-            task.wait(0.1)
-            if InfRangeEnabled and IsGunSelected(child) and child.Parent == G.LP.Character then
-                for gunName, gData in pairs(GunData) do
-                    if child.Name == gData.ToolName and Patchers[gunName] and not PatchedGuns[child] then
-                        pcall(function() Patchers[gunName](child) end)
-                        break
-                    end
-                end
+            task.wait(0.15)
+            if rapidOn and child.Parent == G.LP.Character and isGunSelected(child) then  -- <-- FILTER
+                setupRapid(child)
             end
-            if RapidFireEnabled and IsGunSelected(child) and child.Parent == G.LP.Character then SetupRapidFire(child) end
-            if RemoveDelayEnabled and IsGunSelected(child) and child.Parent == G.LP.Character then SetupRemoveDelay(child) end
+            if delayOn and child.Parent == G.LP.Character and isGunSelected(child) then  -- <-- FILTER
+                setupDelay(child)
+            end
         end
     end)
 end
 
-G.LP.CharacterAdded:Connect(function()
-    CleanupAllWeaponMods()
-    task.delay(0.5, function()
-        if RapidFireEnabled then
-            local char = G.LP.Character
-            if char then
-                local tool = char:FindFirstChildOfClass("Tool")
-                if tool and IsGunSelected(tool) then SetupRapidFire(tool) end
-            end
+-- ============================================
+-- UI CONTROLS
+-- ============================================
+
+Sections.WeaponsLeft:Dropdown({
+    Name = "modification",
+    Flag = "gun_selector_clean",
+    Items = selectedGuns,
+    Default = {"Revolver"},
+    Multi = true,
+    Callback = function(v)
+        currentSelected = v or {}
+        -- Clear caches when selection changes so guns re-evaluate
+        clearRapidGuns()
+        clearDelayGuns()
+        if delayOn and f.hold_mode then
+            stopHoldMode()
+            task.wait(0.1)
+            startHoldMode()
         end
+    end
+})
+
+Sections.WeaponsLeft:Toggle({
+    Name = "inf range",
+    Flag = "inf_range_clean",
+    Default = false,
+    Callback = function(v)
+        rangeOn = v
+        if v then patchGunHandler() end
+    end
+})
+
+Sections.WeaponsLeft:Toggle({
+    Name = "rapid fire",
+    Flag = "rapid_fire_clean",
+    Default = false,
+    Callback = function(v)
+        rapidOn = v
+        if not v then clearRapidGuns() end
+    end
+})
+
+Sections.WeaponsLeft:Toggle({
+    Name = "remove delay",
+    Flag = "remove_delay_clean",
+    Default = false,
+    Callback = function(v)
+        delayOn = v
+        if not v then 
+            clearDelayGuns()
+            stopHoldMode()
+        elseif f.hold_mode then
+            startHoldMode()
+        end
+    end
+})
+
+Sections.WeaponsLeft:Toggle({
+    Name = "hold mode",
+    Flag = "hold_mode",
+    Default = false,
+    Callback = function(v)
+        if v and delayOn then 
+            startHoldMode()
+        else 
+            stopHoldMode()
+        end
+    end
+})
+
+Sections.WeaponsLeft:Slider({
+    Name = "hold delay",
+    Flag = "hold_delay",
+    Default = 0.05,
+    Min = 0.001,
+    Max = 0.15,
+    Decimals = 0.001,
+    Callback = function(v)
+        holdDelay = v
+    end
+})
+
+
+    
+    -- ============================================
+    -- RAGE TARGET
+    -- ============================================
+    local Target = {Enabled = false, AutoKill = false, MultiKill = false, MultiTargets = {}, CurrentTarget = nil, TargetLine = false, LineColor = Color3.fromRGB(255,0,0)}
+    local selectedTarget, autoKillConnection, multiKillConnection, targetLine = nil, nil, nil, nil
+    
+    local function disableWeaponModsForTarget()
         if InfRangeEnabled then
-            local char = G.LP.Character
-            if char then
-                local tool = char:FindFirstChildOfClass("Tool")
-                if tool and IsGunSelected(tool) then
-                    for gunName, gData in pairs(GunData) do
-                        if tool.Name == gData.ToolName and Patchers[gunName] and not PatchedGuns[tool] then
-                            pcall(function() Patchers[gunName](tool) end)
-                            break
+            InfRangeEnabled = false
+            for gun, _ in pairs(PatchedGuns) do CleanupGun(gun) end
+            pcall(function() if Sections.WeaponsLeft and Sections.WeaponsLeft.Toggles and Sections.WeaponsLeft.Toggles.inf_range then Sections.WeaponsLeft.Toggles.inf_range:Set(false) end end)
+        end
+        if RapidFireEnabled then
+            RapidFireEnabled = false
+            for tool, _ in pairs(RapidFireTools) do CleanupRapidFire(tool) end
+            RapidFireTools = {}
+            pcall(function() if Sections.WeaponsLeft and Sections.WeaponsLeft.Toggles and Sections.WeaponsLeft.Toggles.rapid_fire then Sections.WeaponsLeft.Toggles.rapid_fire:Set(false) end end)
+        end
+    end
+    
+    local function getCurrentGun()
+        local char = G.LP.Character
+        if not char then return nil end
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool and tool:FindFirstChild("Ammo") and tool:FindFirstChild("Handle") then return tool end
+        return nil
+    end
+    
+    local function getTargetFromCrosshair()
+        local mousePos = G.U:GetMouseLocation()
+        local closest, shortest = nil, 150
+        for _, p in ipairs(G.P:GetPlayers()) do
+            if p ~= G.LP and p.Character then
+                local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 then
+                    local be = p.Character:FindFirstChild("BodyEffects")
+                    local knocked = false
+                    if be then local ko = be:FindFirstChild("K.O") if ko and ko.Value == true then knocked = true end end
+                    if not knocked then
+                        local head = p.Character:FindFirstChild("Head")
+                        if head then
+                            local screenPos, onScreen = G.C:WorldToScreenPoint(head.Position)
+                            if onScreen then
+                                local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                                if dist < shortest then shortest, closest = dist, p end
+                            end
                         end
                     end
                 end
             end
         end
-        if RemoveDelayEnabled then
-            local char = G.LP.Character
-            if char then
-                local tool = char:FindFirstChildOfClass("Tool")
-                if tool and IsGunSelected(tool) then SetupRemoveDelay(tool) end
-            end
-            if RemoveDelayHold then StartHoldMode() end
-        end
-    end)
-end)
-
--- WEAPONS MENU
-Sections.WeaponsLeft:Dropdown({Name = "modification", Flag = "gun_selector", Items = {"Revolver", "Tactical SG"}, Default = {"Revolver"}, Multi = true, Callback = function(selected)
-    SelectedGuns = selected
-    for gun, _ in pairs(PatchedGuns) do
-        local stillSelected = false
-        for _, name in ipairs(selected) do if gun.Name == GunData[name].ToolName then stillSelected = true break end end
-        if not stillSelected then CleanupGun(gun) end
+        return closest
     end
-    if InfRangeEnabled then 
-        task.delay(0.1, function() ScanAndPatch() end)
-    end
-    if #selected > 0 then task.delay(0.3, ForceRefillAllGuns) end
-end})
-
-
-
-
-
-Sections.WeaponsLeft:Toggle({Name = "rapid fire", Flag = "rapid_fire", Default = false, Callback = function(v)
-    if v and _KillAllEnabled then
-        pcall(function() if Sections.WeaponsLeft and Sections.WeaponsLeft.Toggles and Sections.WeaponsLeft.Toggles.rapid_fire then Sections.WeaponsLeft.Toggles.rapid_fire:Set(false) end end)
-        return
-    end
-    RapidFireEnabled = v
-    if not v then for tool, _ in pairs(RapidFireTools) do CleanupRapidFire(tool) end RapidFireTools = {}
-    else task.delay(0.1, function() if RapidFireEnabled then
-        local char = G.LP.Character
-        if char then local tool = char:FindFirstChildOfClass("Tool") if tool and IsGunSelected(tool) then SetupRapidFire(tool) end end
-        ForceRefillAllGuns()
-    end end) end
-end})
-
-Sections.WeaponsLeft:Toggle({Name = "remove delay", Flag = "remove_delay", Default = false, Callback = function(v)
-    if v and _KillAllEnabled then
-        pcall(function() if Sections.WeaponsLeft and Sections.WeaponsLeft.Toggles and Sections.WeaponsLeft.Toggles.remove_delay then Sections.WeaponsLeft.Toggles.remove_delay:Set(false) end end)
-        return
-    end
-    RemoveDelayEnabled = v
-    if not v then StopHoldMode()
-        for tool, _ in pairs(RemoveDelayTools) do CleanupRemoveDelay(tool) end RemoveDelayTools = {}
-    else task.delay(0.1, function() if RemoveDelayEnabled then
-        local char = G.LP.Character
-        if char then local tool = char:FindFirstChildOfClass("Tool") if tool and IsGunSelected(tool) then SetupRemoveDelay(tool) end end
-        ForceRefillAllGuns()
-        if RemoveDelayHold then StartHoldMode() end
-    end end) end
-end})
-
-Sections.WeaponsLeft:Toggle({Name = "hold mode", Flag = "remove_delay_hold", Default = false, Callback = function(v)
-    RemoveDelayHold = v
-    if v and RemoveDelayEnabled then StartHoldMode() else StopHoldMode() end
-end})
-
-Sections.WeaponsLeft:Slider({Name = "hold delay", Flag = "remove_delay_hold_delay", Default = 0.075, Min = 0.001, Max = 0.150, Decimals = 0.001, Callback = function(v)
-    RemoveDelayHoldDelay = v
-    if RemoveDelayHold and RemoveDelayEnabled then StopHoldMode() StartHoldMode() end
-end})
     
-
+    local function killTarget(player)
+        if not player or not player.Character or isRefilling then return false end
+        local char, bp = G.LP.Character, G.LP:FindFirstChild("Backpack")
+        if not char or not bp then return false end
+        local tool = getCurrentGun()
+        if not tool then
+            for _, child in ipairs(bp:GetChildren()) do
+                if child:IsA("Tool") and child:FindFirstChild("Ammo") and child:FindFirstChild("Handle") then
+                    child.Parent = char
+                    tool = child
+                    break
+                end
+            end
+            if not tool then return false end
+        end
+        local currentWeaponName, handle, ammo = tool.Name, tool:FindFirstChild("Handle"), tool:FindFirstChild("Ammo")
+        if not handle or not ammo or KillRemote == nil then return false end
+        if ammo.Value <= 0 and not isRefilling then requestAmmoRefill(tool) return false end
+        if isRefilling then return false end
+        local targetChar = player.Character
+        if not targetChar then return false end
+        local head = targetChar:FindFirstChild("Head")
+        if not head then return false end
+        local hum = targetChar:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then return false end
+        local be = targetChar:FindFirstChild("BodyEffects")
+        if be then local ko = be:FindFirstChild("K.O") if ko and ko.Value == true then return false end end
+        local pos = head.Position
+        local pellets = {}
+        for _ = 1, 20 do pellets[#pellets + 1] = {AimPosition = pos, Result1 = pos, Result2 = head, Result3 = Vector3.yAxis} end
+        local rangeObj, dmgObj = tool:FindFirstChild("Range"), tool:FindFirstChild("Damage")
+        local range, dmg = rangeObj and rangeObj.Value or 200, dmgObj and dmgObj.Value or 50
+        tool.Enabled = true
+        if tool.Parent ~= char then tool.Parent = char end
+        local shots = tool.Name == "[Revolver]" and 3 or 8
+        for _ = 1, shots do KillRemote:FireServer("ShootGun", handle, handle.Position, pellets, nil, nil, nil, range, dmg) end
+        task.spawn(function() task.wait(1.0)
+            local attempts = 0
+            while attempts < 5 do attempts = attempts + 1 task.wait(0.1)
+                local char2 = G.LP.Character
+                if not char2 then continue end
+                if char2:FindFirstChild(currentWeaponName) then return end
+                local bp2 = G.LP:FindFirstChild("Backpack")
+                if bp2 then local tool2 = bp2:FindFirstChild(currentWeaponName) if tool2 then tool2.Parent = char2 return end end
+            end
+        end)
+        return true
+    end
+    
+    local function isValidTarget2(p)
+        if not p or p == G.LP or not p.Character then return false end
+        local hum = p.Character:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then return false end
+        local be = p.Character:FindFirstChild("BodyEffects")
+        if be then local ko = be:FindFirstChild("K.O") if ko and ko.Value == true then return false end end
+        return true
+    end
+    
+    local function CreateTargetLine()
+        if not targetLine then
+            local success, line = pcall(function() return Drawing.new("Line") end)
+            if success and line then targetLine = line targetLine.Thickness = 2 targetLine.Color = Target.LineColor targetLine.Transparency = 1 targetLine.Visible = false return targetLine end
+        end
+        return targetLine
+    end
+    
+    local function UpdateTargetLine2()
+        if not Target.Enabled or not Target.TargetLine or not selectedTarget then
+            if targetLine then targetLine.Visible = false end
+            return
+        end
+        if not isValidTarget2(selectedTarget) then if targetLine then targetLine.Visible = false end return end
+        local head = selectedTarget.Character:FindFirstChild("Head")
+        if not head then if targetLine then targetLine.Visible = false end return end
+        local screenPos, onScreen = G.C:WorldToScreenPoint(head.Position)
+        if not onScreen then if targetLine then targetLine.Visible = false end return end
+        local mousePos = G.U:GetMouseLocation()
+        local line = CreateTargetLine()
+        if line then line.From = Vector2.new(mousePos.X, mousePos.Y) line.To = Vector2.new(screenPos.X, screenPos.Y) line.Color = Target.LineColor line.Visible = true end
+    end
+    
+    local function StartAutoKill()
+        if autoKillConnection then return end
+        autoKillConnection = G.R.Heartbeat:Connect(function()
+            if not Target.AutoKill or not Target.Enabled or not selectedTarget then return end
+            if isValidTarget2(selectedTarget) then
+                local tool = getCurrentGun()
+                if tool then local ammo = tool:FindFirstChild("Ammo") if ammo and ammo.Value <= 0 then requestAmmoRefill(tool) return end end
+                killTarget(selectedTarget)
+            end
+            UpdateTargetLine2()
+        end)
+    end
+    
+    local function StopAutoKill()
+        if autoKillConnection then autoKillConnection:Disconnect() autoKillConnection = nil end
+        if targetLine then targetLine.Visible = false end
+    end
+    
+    local function StartMultiKill()
+        if multiKillConnection then return end
+        multiKillConnection = G.R.Heartbeat:Connect(function()
+            if not Target.MultiKill or not Target.Enabled or not Target.MultiTargets or #Target.MultiTargets == 0 then return end
+            local tool = getCurrentGun()
+            if tool then local ammo = tool:FindFirstChild("Ammo") if ammo and ammo.Value <= 0 then requestAmmoRefill(tool) return end end
+            for _, playerName in ipairs(Target.MultiTargets) do
+                local player = G.P:FindFirstChild(playerName)
+                if player and isValidTarget2(player) then killTarget(player) end
+            end
+            UpdateTargetLine2()
+        end)
+    end
+    
+    local function StopMultiKill()
+        if multiKillConnection then multiKillConnection:Disconnect() multiKillConnection = nil end
+        if targetLine then targetLine.Visible = false end
+    end
+    
+    G.R.Heartbeat:Connect(function()
+        if not Target.Enabled or isRefilling then return end
+        local tool = getCurrentGun()
+        if not tool then return end
+        local ammo = tool:FindFirstChild("Ammo")
+        if not ammo then return end
+        if tool.Parent == G.LP.Character and ammo.Value <= 0 and not ammo:GetAttribute("ZeeKillRefillRequested") then requestAmmoRefill(tool) end
+    end)
+    
+    G.U.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed or not Target.Enabled or isRefilling then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and selectedTarget and isValidTarget2(selectedTarget) then killTarget(selectedTarget) end
+    end)
+    
+    G.R.RenderStepped:Connect(function()
+        if Target.Enabled and Target.TargetLine then UpdateTargetLine2()
+        elseif targetLine then targetLine.Visible = false end
+    end)
+    
+    local function GetPlayerNames()
+        local t = {}
+        for _, p in ipairs(G.P:GetPlayers()) do if p ~= G.LP then table.insert(t, p.Name) end end
+        return t
+    end
+    
+    local TargetToggle = Sections.RageTarget:Toggle({Name = 'target', Flag = 'target_system', Default = false, Callback = function(v)
+        Target.Enabled = v
+        if v then disableWeaponModsForTarget()
+        else selectedTarget = nil StopAutoKill() StopMultiKill() if targetLine then targetLine.Visible = false end end
+    end})
+    
+    TargetToggle:Keybind({Flag = 'target_bind', Mode = 'Toggle', Callback = function(s)
+        if s then
+            disableWeaponModsForTarget()
+            local target = getTargetFromCrosshair()
+            if target and isValidTarget2(target) then
+                selectedTarget = target
+                if Target.AutoKill then
+                    local tool = getCurrentGun()
+                    if tool then local ammo = tool:FindFirstChild("Ammo") if ammo and ammo.Value <= 0 then requestAmmoRefill(tool) return end end
+                    killTarget(selectedTarget)
+                end
+            end
+        else selectedTarget = nil StopAutoKill() if targetLine then targetLine.Visible = false end end
+    end})
+    
+    Sections.RageTarget:Toggle({Name = 'auto kill', Flag = 'auto_kill_target', Default = false, Callback = function(v)
+        Target.AutoKill = v
+        if v and Target.Enabled then StartAutoKill()
+            if selectedTarget and isValidTarget2(selectedTarget) then killTarget(selectedTarget) end
+        else StopAutoKill() end
+    end})
+    
+    Sections.RageTarget:Toggle({Name = 'multi kill', Flag = 'multi_kill_targets', Default = false, Callback = function(v)
+        Target.MultiKill = v
+        if v and Target.Enabled then StartMultiKill() else StopMultiKill() end
+    end})
+    
+    local multiDropdown = Sections.RageTarget:Dropdown({Name = 'targets', Flag = 'kill_targets_list', Items = GetPlayerNames(), Default = {}, Multi = true, Callback = function(v) Target.MultiTargets = v or {} end})
+    
+    local function refreshMultiDropdown()
+        local names = GetPlayerNames()
+        if type(multiDropdown.Refresh) == "function" then multiDropdown:Refresh(names)
+        elseif type(multiDropdown.SetItems) == "function" then multiDropdown:SetItems(names)
+        elseif type(multiDropdown.SetValues) == "function" then multiDropdown:SetValues(names) end
+    end
+    G.P.PlayerAdded:Connect(refreshMultiDropdown)
+    G.P.PlayerRemoving:Connect(refreshMultiDropdown)
+    task.defer(function()
+        task.wait(0.1)
+        local inst = typeof(multiDropdown) == "Instance" and multiDropdown or (type(multiDropdown) == "table" and multiDropdown.Instance)
+        if inst then for _, d in ipairs(inst:GetDescendants()) do if d:IsA("GuiButton") then d.Activated:Connect(refreshMultiDropdown) break end end end
+    end)
+    
+    local LineToggle = Sections.RageTarget:Toggle({Name = 'target line', Flag = 'target_line', Default = false, Callback = function(v)
+        Target.TargetLine = v
+        if not v and targetLine then targetLine.Visible = false end
+    end})
+    LineToggle:Colorpicker({Flag = 'target_line_color', Default = Color3.fromRGB(255,0,0), Alpha = 0, Callback = function(c,a) Target.LineColor = c if targetLine then targetLine.Color = c end end})
     
     -- ============================================
 -- ESP (WHITE TEXT)
@@ -1773,9 +1505,386 @@ if f.watermark_hotkeys then updateWatermark() end
         Armor.Running = false
     end
     
+    Sections.SelfLeft:Toggle({Name = "enable armor", Flag = "enable_armor_mod", Default = false, Callback = function(v) Armor.Enabled = v end})
+    Sections.SelfLeft:Slider({Name = "armor amount", Flag = "armor_amount", Default = 1, Min = 0, Max = 1000000000, Decimals = 1, Callback = function(v) Armor.Value = v end})
+    Sections.SelfLeft:Button({Name = "apply", Callback = ApplyArmor})
     
+    -- ============================================
+    -- SENTRY (RETAINED FROM YOUR CODE)
+    -- ============================================
+    -- [SENTRY CODE - COMPACTED BUT FUNCTIONALLY SAME]
+    local SentryState = {Enabled = false, OthersEnabled = false, TargetPlayer = nil}
     
-
+    local function SentryMain()
+        local CONFIG = {AIM_HIT_RADIUS = 45, FIRE_WINDOW = 0.7, VOID_DIST = 120, SHOT_COUNT = 8, PELLET_COUNT = 20, RETRY_ATTEMPTS = 3, TRUST_WINDOW = 1.5, FIRE_EXPIRY = 1.5}
+        local Players, ReplicatedStorage, RunService, LocalPlayer, Environment = game:GetService("Players"), game:GetService("ReplicatedStorage"), game:GetService("RunService"), game.Players.LocalPlayer, (getgenv and getgenv()) or _G
+        local LoadedLibrary = Environment.Library or _G.Library
+        local SentryActive, SentryConnections, CharConns, RefillGen, refillActive, GunWatch = false, {}, {}, 0, false, setmetatable({}, {__mode="k"})
+        local lastAttacker, healthConnection = nil, nil
+        local FireTracker = {FiredAt = {}, Mouse = {}, FireWhy = {}}
+        local HealthState = {Last = nil, LastHitAt = 0, LastGunshotAt = 0, LastTrustedShooter = nil, LastTrustedAt = 0, DamageTaken = 0}
+        
+        local function SentrySubscribe(signal, fn) local conn = signal:Connect(fn) if SentryActive then SentryConnections[#SentryConnections+1] = conn else pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end) end return conn end
+        local function CharSubscribe(signal, fn) local conn = SentrySubscribe(signal, fn) CharConns[#CharConns+1] = conn return conn end
+        
+        local function findKillRemote()
+            for _, object in ipairs(ReplicatedStorage:GetDescendants()) do if object:IsA("RemoteEvent") then local name = object.Name:lower() if name:find("main",1,true) or name:find("game",1,true) then return object end end end
+            return nil
+        end
+        local function findLoadoutRemote()
+            for _, object in ipairs(ReplicatedStorage:GetDescendants()) do if object:IsA("RemoteEvent") and object.Name:lower():find("loadout",1,true) then return object end end
+            return nil
+        end
+        local KillAllRemote, LoadoutRemote = findKillRemote(), findLoadoutRemote()
+        local Guns = {["[Double-Barrel SG]"]=true, ["[Revolver]"]=true, ["[TacticalShotgun]"]=true}
+        local Loadout = {"[Double-Barrel SG]","[Revolver]","[TacticalShotgun]","None"}
+        
+        local function isFriendlyWhitelisted(player)
+            if LoadedLibrary == nil or type(LoadedLibrary.get_priority) ~= "function" then return false end
+            local success, priority = pcall(function() return LoadedLibrary.get_priority(player) end)
+            return success and tostring(priority or ""):lower() == "friendly"
+        end
+        
+        local function requestAmmoRefill2(tool, ammo)
+            if LoadoutRemote == nil or refillActive or tool == nil or ammo == nil or not SentryActive or ammo:GetAttribute("ZeeKillRefillRequested") then return false end
+            local character, backpack = LocalPlayer.Character, LocalPlayer:FindFirstChild("Backpack")
+            if backpack == nil then return false end
+            ammo:SetAttribute("ZeeKillRefillRequested", true)
+            refillActive = true
+            local reqName, oldTools, eqTools, newestTools, seen = tool.Name, {}, {}, {}, {}
+            for _, cont in ipairs({backpack, character}) do
+                if cont then for _, item in ipairs(cont:GetChildren()) do
+                    if item:IsA("Tool") and Guns[item.Name] then
+                        oldTools[item] = true
+                        if item.Parent == character then eqTools[item.Name] = true end
+                    end
+                end end
+            end
+            local connections, stopped, deadline, lastAdd, gen = {}, false, os.clock()+2, os.clock(), RefillGen
+            local function stop()
+                if stopped then return end
+                stopped = true
+                for _, connection in ipairs(connections) do connection:Disconnect() end
+                if not newestTools[reqName] and ammo.Parent then ammo:SetAttribute("ZeeKillRefillRequested", nil) end
+                refillActive = false
+            end
+            local function accept(item)
+                if not item:IsA("Tool") or not Guns[item.Name] or oldTools[item] or seen[item] then return end
+                seen[item], lastAdd = true, os.clock()
+                local name = item.Name
+                local prev = newestTools[name]
+                if prev and prev ~= item and prev.Parent then prev:Destroy() end
+                newestTools[name] = item
+                for old in pairs(oldTools) do if old.Name == name and old.Parent then old:Destroy() end end
+                if eqTools[name] and character and item.Parent then item.Parent = character end
+            end
+            connections[1] = backpack.ChildAdded:Connect(accept)
+            if character then connections[2] = character.ChildAdded:Connect(accept) end
+            LoadoutRemote:FireServer(Loadout)
+            local heartbeat = RunService.Heartbeat:Connect(function()
+                if gen ~= RefillGen then stop() return end
+                if os.clock() >= deadline or (next(newestTools) and os.clock()-lastAdd >= 0.2) then stop() end
+            end)
+            return true
+        end
+        
+        local function usableAmmo(tool, ammo)
+            if ammo.Value <= 0 then requestAmmoRefill2(tool, ammo) return false end
+            if not ammo:GetAttribute("ZeeKillAmmoWatching") then
+                ammo:SetAttribute("ZeeKillAmmoWatching", true)
+                local conn = CharSubscribe(ammo:GetPropertyChangedSignal("Value"), function()
+                    if ammo.Value <= 0 then conn:Disconnect() requestAmmoRefill2(tool, ammo) end
+                end)
+            end
+            return true
+        end
+        
+        local function getTacticalShotgun(character, backpack)
+            return backpack:FindFirstChild("[TacticalShotgun]") or (character and character:FindFirstChild("[TacticalShotgun]"))
+        end
+        
+        local function killTarget2(player)
+            if not SentryActive then return false end
+            local character, backpack = LocalPlayer.Character, LocalPlayer:FindFirstChild("Backpack")
+            if character == nil or backpack == nil then return false end
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            local tool = getTacticalShotgun(character, backpack)
+            local handle = tool and tool:FindFirstChild("Handle")
+            local ammo = tool and tool:FindFirstChild("Ammo")
+            if KillAllRemote == nil or humanoid == nil or tool == nil or handle == nil or ammo == nil then return false end
+            if not usableAmmo(tool, ammo) then return false end
+            local targetCharacter = player and player.Character
+            local targetHumanoid = targetCharacter and targetCharacter:FindFirstChildOfClass("Humanoid")
+            local head = targetCharacter and targetCharacter:FindFirstChild("Head")
+            local targetBE = targetCharacter and targetCharacter:FindFirstChild("BodyEffects")
+            local targetKO = targetBE and targetBE:FindFirstChild("K.O")
+            local targetKnocked = targetKO and targetKO.Value == true
+            if targetCharacter == nil or targetHumanoid == nil or targetHumanoid.Health <= 0 or targetKnocked or head == nil then return false end
+            local pos = head.Position
+            local pellets = {}
+            for _ = 1, 20 do pellets[#pellets+1] = {AimPosition=pos, Result1=pos, Result2=head, Result3=Vector3.yAxis} end
+            local damageObject = tool:FindFirstChild("Damage")
+            local damage = damageObject and damageObject.Value or 50
+            tool.Enabled = true
+            if tool.Parent ~= character then tool.Parent = character end
+            for _ = 1, 8 do KillAllRemote:FireServer("ShootGun", handle, handle.Position, pellets, nil, nil, nil, math.huge, damage) end
+            if tool.Parent then tool.Parent = backpack end
+            return true
+        end
+        
+        -- Attacker detection
+        local function isCreatorTagName(name)
+            if type(name) ~= "string" then return false end
+            local ln = string.lower(name)
+            return ln:find("creator",1,true) or ln:find("killer",1,true) or ln:find("damager",1,true) or ln:find("lastdamager",1,true) or ln:find("attacker",1,true) or ln:find("causedby",1,true) or ln:find("hitby",1,true) or ln:find("lastattacker",1,true) or ln:find("shooter",1,true) or ln:find("owner",1,true)
+        end
+        
+        local function playerFromValue(value)
+            if typeof(value) == "Instance" then
+                if value:IsA("Player") then return value end
+                local plr = Players:GetPlayerFromCharacter(value)
+                if plr then return plr end
+                if value.Parent and value.Parent:IsA("Model") then return Players:GetPlayerFromCharacter(value.Parent) end
+            elseif type(value) == "string" and value ~= "" then
+                local byName = Players:FindFirstChild(value)
+                if byName and byName:IsA("Player") then return byName end
+                for _, plr in ipairs(Players:GetPlayers()) do if plr.Name == value or plr.DisplayName == value then return plr end end
+            elseif type(value) == "number" then local ok, plr = pcall(Players.GetPlayerByUserId, Players, value) if ok then return plr end end
+            return nil
+        end
+        
+        local function playerFromTag(tag)
+            if not tag then return nil end
+            if tag:IsA("ObjectValue") or tag:IsA("StringValue") or tag:IsA("IntValue") or tag:IsA("NumberValue") then return playerFromValue(tag.Value) end
+            return nil
+        end
+        
+        local function rememberTrusted(plr, why)
+            if not plr or plr == LocalPlayer or plr.Parent ~= Players then return end
+            if isFriendlyWhitelisted(plr) then return end
+            HealthState.LastTrustedShooter, HealthState.LastTrustedAt = plr, os.clock()
+        end
+        
+        local function collectCreatorPlayers(root, into, seen)
+            if not root then return end
+            local function consider(inst)
+                if not (inst:IsA("ObjectValue") or inst:IsA("StringValue") or inst:IsA("IntValue") or inst:IsA("NumberValue")) then return end
+                if not isCreatorTagName(inst.Name) then return end
+                local plr = playerFromTag(inst)
+                if plr and plr ~= LocalPlayer and not seen[plr] and not isFriendlyWhitelisted(plr) then seen[plr] = true into[#into+1] = plr end
+            end
+            for _, child in ipairs(root:GetChildren()) do consider(child) end
+            for _, desc in ipairs(root:GetDescendants()) do consider(desc) end
+        end
+        
+        local function findCreatorAttacker(hum)
+            local char = LocalPlayer.Character
+            if not hum then hum = char and char:FindFirstChildOfClass("Humanoid") end
+            if not hum then return nil end
+            local list, seen = {}, {}
+            collectCreatorPlayers(hum, list, seen)
+            if char then
+                collectCreatorPlayers(char, list, seen)
+                local be = char:FindFirstChild("BodyEffects")
+                if be then
+                    collectCreatorPlayers(be, list, seen)
+                    for _, child in ipairs(be:GetChildren()) do collectCreatorPlayers(child, list, seen) end
+                end
+                for _, child in ipairs(char:GetChildren()) do collectCreatorPlayers(child, list, seen) end
+            end
+            if #list == 0 then return nil end
+            if #list == 1 then return list[1] end
+            local locked = HealthState.LastTrustedShooter
+            if locked and seen[locked] then return locked end
+            return list[1]
+        end
+        
+        local function recordFire(player, why)
+            if not player or player == LocalPlayer then return end
+            FireTracker.FiredAt[player], FireTracker.FireWhy = os.clock(), FireTracker.FireWhy or {}
+            FireTracker.FireWhy[player] = why or "fire"
+        end
+        
+        local function findAttacker()
+            local myChar, hum = LocalPlayer.Character, nil
+            if myChar then hum = myChar:FindFirstChildOfClass("Humanoid") end
+            local tagged = findCreatorAttacker(hum)
+            if tagged and tagged.Parent == Players then rememberTrusted(tagged, "creator-tag") return tagged end
+            local locked = HealthState.LastTrustedShooter
+            if locked and locked.Parent == Players and (os.clock()-HealthState.LastTrustedAt) <= CONFIG.TRUST_WINDOW then return locked end
+            local now = os.clock()
+            for p, at in pairs(FireTracker.FiredAt) do
+                if p ~= LocalPlayer and p.Parent == Players and (now-at) <= CONFIG.FIRE_WINDOW then rememberTrusted(p, "recent-firer") return p end
+            end
+            return nil
+        end
+        
+        local function onHealthChanged()
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if not hum then return end
+            local current, last = hum.Health, HealthState.Last
+            if last ~= nil and current < last - 0.5 and current > 0 then
+                HealthState.LastHitAt, HealthState.DamageTaken = os.clock(), last - current
+                local attacker = findAttacker()
+                if attacker and attacker.Parent == Players then
+                    lastAttacker = attacker
+                    task.spawn(function()
+                        for i = 1, CONFIG.RETRY_ATTEMPTS do
+                            if not SentryActive then break end
+                            if killTarget2(attacker) then break end
+                            task.wait(0.1)
+                        end
+                    end)
+                end
+            end
+            HealthState.Last = current
+        end
+        
+        -- Scanner
+        local function findAmmoValue(tool)
+            if not tool then return nil end
+            local ammo = tool:FindFirstChild("Ammo") or tool:FindFirstChild("ammo") or tool:FindFirstChild("AMMO")
+            if ammo and ammo:IsA("ValueBase") then return ammo end
+            for _, d in ipairs(tool:GetDescendants()) do if d:IsA("ValueBase") and string.lower(d.Name) == "ammo" then return d end end
+            return nil
+        end
+        
+        local function allToolsWithAmmo(player)
+            local list = {}
+            local function add(container)
+                if not container then return end
+                for _, t in ipairs(container:GetChildren()) do if t:IsA("Tool") and findAmmoValue(t) then list[#list+1] = t end end
+            end
+            add(player.Character)
+            add(player:FindFirstChild("Backpack"))
+            return list
+        end
+        
+        local function watchGunFiringFlag(be, player)
+            if not be or be:GetAttribute("__sentry_gf_watch") then return end
+            be:SetAttribute("__sentry_gf_watch", true)
+            for _, name in ipairs({"GunFiring","Shooting","Attacking","GunFire"}) do
+                local flag = be:FindFirstChild(name)
+                if flag and flag:IsA("ValueBase") and not flag:GetAttribute("__sentry_gf") then
+                    flag:SetAttribute("__sentry_gf", true)
+                    SentrySubscribe(flag.Changed, function()
+                        local v = flag.Value
+                        if v == true or v == 1 then
+                            local mp = FireTracker.Mouse[player]
+                            local myHead = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
+                            local aimed = myHead and mp and typeof(mp) == "Vector3" and (mp - myHead.Position).Magnitude <= 45
+                            if aimed then recordFire(player, name) end
+                        end
+                    end)
+                end
+            end
+        end
+        
+        local function scanPlayers()
+            local now = os.clock()
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer then
+                    local char = p.Character
+                    if char then
+                        local be = char:FindFirstChild("BodyEffects")
+                        if be then
+                            local mp = be:FindFirstChild("MousePos")
+                            if mp then local ok, v = pcall(function() return mp.Value end) if ok and typeof(v) == "Vector3" then FireTracker.Mouse[p] = v end end
+                            watchGunFiringFlag(be, p)
+                        end
+                    end
+                    for _, tool in ipairs(allToolsWithAmmo(p)) do
+                        local ammo = findAmmoValue(tool)
+                        local watch = GunWatch[tool]
+                        if ammo then
+                            local val = tonumber(ammo.Value) or 0
+                            if watch then if val < watch.ammo then recordFire(p, "ammo") end watch.ammo = val
+                            else GunWatch[tool] = {player = p, ammo = val} end
+                        elseif watch then GunWatch[tool] = nil end
+                    end
+                end
+            end
+            for plr, at in pairs(FireTracker.FiredAt) do if now - at > CONFIG.FIRE_EXPIRY then FireTracker.FiredAt[plr] = nil end end
+        end
+        
+        -- Setup
+        local function watchCreatorOnInstance(inst)
+            if not inst then return end
+            local function consider(child)
+                if not child or not isCreatorTagName(child.Name) then return end
+                local function onChanged()
+                    local plr = playerFromTag(child)
+                    if plr then rememberTrusted(plr, "creator-live") end
+                end
+                if child:IsA("ValueBase") then CharSubscribe(child.Changed, onChanged) end
+                task.defer(onChanged)
+            end
+            for _, child in ipairs(inst:GetChildren()) do consider(child) end
+            CharSubscribe(inst.ChildAdded, consider)
+        end
+        
+        local function cleanupCharacter()
+            if healthConnection then pcall(function() healthConnection:Disconnect() end) healthConnection = nil end
+            for _, conn in ipairs(CharConns) do pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end) end
+            CharConns = {}
+        end
+        
+        local function setupCharacter()
+            cleanupCharacter()
+            RefillGen, refillActive, HealthState.Last, HealthState.LastHitAt, HealthState.LastGunshotAt, HealthState.LastTrustedShooter, HealthState.LastTrustedAt, FireTracker.Mouse, lastAttacker = RefillGen+1, false, nil, 0, 0, nil, 0, {}, nil
+            local char = LocalPlayer.Character
+            if not char then return end
+            task.wait(0.2)
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then HealthState.Last = hum.Health healthConnection = hum:GetPropertyChangedSignal("Health"):Connect(onHealthChanged) watchCreatorOnInstance(hum) end
+            watchCreatorOnInstance(char)
+            local be = char:FindFirstChild("BodyEffects")
+            if be then
+                watchCreatorOnInstance(be)
+                for _, child in ipairs(be:GetChildren()) do watchCreatorOnInstance(child) end
+            end
+        end
+        
+        local function SentryStart()
+            if SentryActive then return end
+            SentryActive = true
+            SentrySubscribe(RunService.Heartbeat, scanPlayers)
+            setupCharacter()
+            SentrySubscribe(LocalPlayer.CharacterAdded, function()
+                task.wait(0.4)
+                if SentryActive then setupCharacter() end
+            end)
+        end
+        
+        local function SentryStop()
+            if not SentryActive then return end
+            SentryActive = false
+            cleanupCharacter()
+            for _, conn in ipairs(SentryConnections) do pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end) end
+            SentryConnections = {}
+        end
+        
+        return {Start = SentryStart, Stop = SentryStop, IsActive = function() return SentryActive end}
+    end
+    
+    local SentryCore = SentryMain()
+    local SentrySection = Sections.SelfSentry or (Sections and Sections.Self and Sections.Self:Section({Name = 'sentry', Side = 2})) or Sections.RageRight
+    
+    if SentrySection then
+        SentrySection:Toggle({Name = "enable sentry", Flag = "enable_sentry", Default = false, Callback = function(v)
+            SentryState.Enabled = v
+            if v then SentryCore:Start() else SentryCore:Stop() end
+        end})
+    else
+        game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if input.KeyCode == Enum.KeyCode.T then
+                SentryState.Enabled = not SentryState.Enabled
+                if SentryState.Enabled then SentryCore:Start() else SentryCore:Stop() end
+            end
+        end)
+    end
     
 -- AUTO STIM - FULLY WORKING
 P=game:GetService("Players")
@@ -2030,7 +2139,22 @@ end)
 X()
 print("Auto Stim Loaded - Toggle ON")
 
+    -- ============================================
+    -- MUSCLE
+    -- ============================================
+    local Muscle = {Enabled = false, Value = 50000}
+    local MuscleRemote = G.RS:FindFirstChild("MainGameEvent", true)
     
+    Sections.SelfRight:Toggle({Name = "enable size", Flag = "enable_size_mod", Default = false, Callback = function(v) Muscle.Enabled = v end})
+    Sections.SelfRight:Slider({Name = "muscle", Flag = "muscle", Default = 50000, Min = 0, Max = 10000000, Decimals = 1, Callback = function(v) Muscle.Value = v end})
+    Sections.SelfRight:Button({Name = "set muscle", Callback = function()
+        if not Muscle.Enabled or not MuscleRemote then return end
+        MuscleRemote:FireServer("ChangeSettings", "MuscleInformation", Muscle.Value)
+    end})
+    Sections.SelfRight:Button({Name = "max size", Callback = function()
+        if not Muscle.Enabled or not MuscleRemote then return end
+        MuscleRemote:FireServer("ChangeSettings", "MuscleInformation", 9e9)
+    end})
     
     -- ============================================
     -- WALK
@@ -2348,7 +2472,204 @@ Sections.MovementLeft:Slider({Name = "fly speed", Flag = "fly_speed", Default = 
         end
     end)
     
-    
+    -- ============================================
+    -- KILL ALL
+    -- ============================================
+    _KillAllEnabled = false
+    _KA_killAll = nil
+    do
+        local Kill = {Enabled = false, Auto = false, IgnoreFriends = false, Whitelist = {}}
+        local KillGuns = {["[Double-Barrel SG]"]=true, ["[Revolver]"]=true, ["[TacticalShotgun]"]=true}
+        local KillLoadout = {"[Double-Barrel SG]","[Revolver]","[TacticalShotgun]","None"}
+        local KillRefillActive, KillRefillGen, KillLoopConn = false, 0, nil
+        
+        local function KillFindRemote(name)
+            for _, obj in ipairs(G.RS:GetDescendants()) do if obj:IsA("RemoteEvent") and obj.Name:lower():find(name:lower(),1,true) then return obj end end
+            return nil
+        end
+        local KillRemote2 = KillFindRemote("MainGameEvent") or KillFindRemote("MainRemoteEvent")
+        local KillLoadoutRemote = KillFindRemote("Loadout")
+        
+        local function KillRequestAmmoRefill(tool, ammo)
+            if KillLoadoutRemote == nil or KillRefillActive or tool == nil or ammo == nil or ammo:GetAttribute("ZeeKillRefillRequested") then return false end
+            local char, bp = G.LP.Character, G.LP:FindFirstChild("Backpack")
+            if bp == nil then return false end
+            if ammo.Value > 3 then return false end
+            ammo:SetAttribute("ZeeKillRefillRequested", true)
+            KillRefillActive = true
+            local reqName, oldTools, eqTools, newTools, seen = tool.Name, {}, {}, {}, {}
+            for _, cont in ipairs({bp,char}) do
+                if cont then for _, item in ipairs(cont:GetChildren()) do
+                    if item:IsA("Tool") and KillGuns[item.Name] then
+                        oldTools[item] = true
+                        if item.Parent == char then eqTools[item.Name] = true end
+                    end
+                end end
+            end
+            local conns, stopped, deadline, lastAdd, gen = {}, false, os.clock()+2, os.clock(), KillRefillGen
+            local function stop()
+                if stopped then return end
+                stopped = true
+                for _, c in ipairs(conns) do c:Disconnect() end
+                if not newTools[reqName] and ammo.Parent then ammo:SetAttribute("ZeeKillRefillRequested", nil) end
+                KillRefillActive = false
+            end
+            local function accept(item)
+                if not item:IsA("Tool") or not KillGuns[item.Name] or oldTools[item] or seen[item] then return end
+                seen[item], lastAdd = true, os.clock()
+                local name = item.Name
+                local prev = newTools[name]
+                if prev and prev ~= item and prev.Parent then prev:Destroy() end
+                newTools[name] = item
+                for old in pairs(oldTools) do if old.Name == name and old.Parent then old:Destroy() end end
+                if eqTools[name] and char and item.Parent then item.Parent = char end
+            end
+            conns[1] = bp.ChildAdded:Connect(accept)
+            if char then conns[2] = char.ChildAdded:Connect(accept) end
+            KillLoadoutRemote:FireServer(KillLoadout)
+            local heartbeat = G.R.Heartbeat:Connect(function()
+                if gen ~= KillRefillGen then stop() return end
+                if os.clock() >= deadline or (next(newTools) and os.clock()-lastAdd >= 0.2) then stop() end
+            end)
+            return true
+        end
+        
+        local function KillUsableAmmo(tool, ammo)
+            if ammo.Value <= 0 then KillRequestAmmoRefill(tool, ammo) return false end
+            if not ammo:GetAttribute("ZeeKillAmmoWatching") then
+                ammo:SetAttribute("ZeeKillAmmoWatching", true)
+                local conn = ammo:GetPropertyChangedSignal("Value"):Connect(function()
+                    if ammo.Value <= 0 then conn:Disconnect() KillRequestAmmoRefill(tool, ammo) end
+                end)
+            end
+            return true
+        end
+        
+        local function KillGetGun(char, bp) return bp:FindFirstChild("[TacticalShotgun]") or (char and char:FindFirstChild("[TacticalShotgun]")) end
+        
+        local function KillShouldSkip(p)
+            if Kill.IgnoreFriends then local ok, isF = pcall(function() return G.LP:IsFriendsWith(p.UserId) end) if ok and isF then return true end end
+            if Kill.Whitelist and next(Kill.Whitelist) then for _, name in ipairs(Kill.Whitelist) do if p.Name == name then return true end end end
+            return false
+        end
+        
+        local function KillAll()
+            if not Kill.Enabled then return false end
+            local char, bp = G.LP.Character, G.LP:FindFirstChild("Backpack")
+            if char == nil or bp == nil then return false end
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local tool = KillGetGun(char, bp)
+            local handle = tool and tool:FindFirstChild("Handle")
+            local ammo = tool and tool:FindFirstChild("Ammo")
+            if KillRemote2 == nil or hum == nil or tool == nil or handle == nil or ammo == nil then return false end
+            if not KillUsableAmmo(tool, ammo) then return false end
+            local pellets, targets = {}, 0
+            for _, p in ipairs(G.P:GetPlayers()) do
+                if p ~= G.LP and not KillShouldSkip(p) then
+                    local tc = p.Character
+                    if tc and tc.Parent then
+                        local th, head = tc:FindFirstChild("Humanoid"), tc:FindFirstChild("Head")
+                        if th and th.Health > 0 and head then
+                            local be, ko = tc:FindFirstChild("BodyEffects"), false
+                            if be then local koVal = be:FindFirstChild("K.O") if koVal and koVal.Value == true then ko = true end end
+                            if not ko then
+                                targets = targets + 1
+                                local pos = head.Position
+                                for _ = 1, 20 do pellets[#pellets+1] = {AimPosition=pos, Result1=pos, Result2=head, Result3=Vector3.yAxis} end
+                            end
+                        end
+                    end
+                end
+            end
+            if #pellets == 0 then return false end
+            local rangeObj, dmgObj = tool:FindFirstChild("Range"), tool:FindFirstChild("Damage")
+            local range, dmg = rangeObj and rangeObj.Value or 200, dmgObj and dmgObj.Value or 50
+            tool.Enabled = true
+            if tool.Parent ~= char then tool.Parent = char end
+            for _ = 1, 8 do KillRemote2:FireServer("ShootGun", handle, handle.Position, pellets, nil, nil, nil, range, dmg) end
+            if tool.Parent then tool.Parent = bp end
+            task.spawn(function()
+                task.wait(0.3)
+                local char2, bp2 = G.LP.Character, G.LP:FindFirstChild("Backpack")
+                if not char2 and not bp2 then return end
+                local tool2 = char2 and char2:FindFirstChildOfClass("Tool")
+                if tool2 and tool2:FindFirstChild("Ammo") then
+                    local ammo2 = tool2:FindFirstChild("Ammo")
+                    if ammo2.Value <= 3 and not ammo2:GetAttribute("ZeeKillRefillRequested") then KillRequestAmmoRefill(tool2, ammo2) end
+                end
+                if bp2 then for _, item in ipairs(bp2:GetChildren()) do
+                    if item:IsA("Tool") and KillGuns[item.Name] and item:FindFirstChild("Ammo") then
+                        local ammo2 = item:FindFirstChild("Ammo")
+                        if ammo2.Value <= 3 and not ammo2:GetAttribute("ZeeKillRefillRequested") then KillRequestAmmoRefill(item, ammo2) end
+                    end
+                end end
+            end)
+            return targets > 0
+        end
+        _KA_killAll = KillAll
+        
+        local function KillStartAutoLoop()
+            if KillLoopConn then return end
+            KillLoopConn = G.R.Heartbeat:Connect(function() if Kill.Enabled and Kill.Auto then KillAll() end end)
+        end
+        
+        local function KillStopAutoLoop()
+            if KillLoopConn then KillLoopConn:Disconnect() KillLoopConn = nil end
+        end
+        
+        local function KillDisableWeaponMods()
+            if InfRangeEnabled then
+                InfRangeEnabled = false
+                for gun, _ in pairs(PatchedGuns) do CleanupGun(gun) end
+                pcall(function() if Sections.WeaponsLeft and Sections.WeaponsLeft.Toggles and Sections.WeaponsLeft.Toggles.inf_range then Sections.WeaponsLeft.Toggles.inf_range:Set(false) end end)
+            end
+            if RapidFireEnabled then
+                RapidFireEnabled = false
+                for tool, _ in pairs(RapidFireTools) do CleanupRapidFire(tool) end
+                RapidFireTools = {}
+                pcall(function() if Sections.WeaponsLeft and Sections.WeaponsLeft.Toggles and Sections.WeaponsLeft.Toggles.rapid_fire then Sections.WeaponsLeft.Toggles.rapid_fire:Set(false) end end)
+            end
+        end
+        
+        local KillToggle = Sections.RageRight:Toggle({Name = 'kill all', Flag = 'Kill_All', Default = false, Callback = function(v)
+            Kill.Enabled = v
+            _KillAllEnabled = v
+            if v then KillDisableWeaponMods() if Kill.Auto then KillStartAutoLoop() end
+            else KillStopAutoLoop() end
+        end})
+        
+        Sections.RageRight:Toggle({Name = 'auto kill all', Flag = 'auto_kill_all', Default = false, Callback = function(v)
+            Kill.Auto = v
+            if v and Kill.Enabled then KillDisableWeaponMods() KillStartAutoLoop()
+            elseif not v then KillStopAutoLoop() end
+        end})
+        
+        KillToggle:Keybind({Flag = 'kill_all_bind', Mode = 'Hold', Callback = function(s) if s and Kill.Enabled and type(_KA_killAll) == "function" then _KA_killAll() end end})
+        
+        Sections.RageRight:Toggle({Name = 'ignore friends', Flag = 'ignore_friends', Default = false, Callback = function(v) Kill.IgnoreFriends = v end})
+        
+        local function KillGetNames()
+            local t = {}
+            for _, p in ipairs(G.P:GetPlayers()) do if p ~= G.LP then table.insert(t, p.Name) end end
+            return t
+        end
+        
+        local wlDropdown = Sections.RageRight:Dropdown({Name = 'whitelist players', Flag = 'whitelist_players', Items = KillGetNames(), Default = {}, Multi = true, Callback = function(v) Kill.Whitelist = v or {} end})
+        
+        local function KillRefreshWhitelist()
+            local names = KillGetNames()
+            if type(wlDropdown.Refresh) == "function" then wlDropdown:Refresh(names)
+            elseif type(wlDropdown.SetItems) == "function" then wlDropdown:SetItems(names)
+            elseif type(wlDropdown.SetValues) == "function" then wlDropdown:SetValues(names) end
+        end
+        G.P.PlayerAdded:Connect(KillRefreshWhitelist)
+        G.P.PlayerRemoving:Connect(KillRefreshWhitelist)
+        task.defer(function()
+            task.wait(0.1)
+            local inst = typeof(wlDropdown) == "Instance" and wlDropdown or (type(wlDropdown) == "table" and wlDropdown.Instance)
+            if inst then for _, d in ipairs(inst:GetDescendants()) do if d:IsA("GuiButton") then d.Activated:Connect(KillRefreshWhitelist) break end end end
+        end)
+    end
     
     -- ============================================
     -- SPECTATE
