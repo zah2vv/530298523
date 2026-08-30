@@ -183,185 +183,321 @@ do
     FovColorLabel:Colorpicker({Name = 'color', Flag = 'fov_color', Default = Color3.fromRGB(255,0,0), Callback = function(c) AimState.Circle.Color = c end})
     Sections.LegitLeft:Slider({Name = 'Prediction Time', Flag = 'prediction_time', Default = 0.13, Min = 0, Max = 1, Decimals = 0.01})
     
-    -- ============================================
-    -- SILENT AIM
-    -- ============================================
-    local Silent = {
-        Enabled = false, ShowFOV = false, FOV = 65, FOVSides = 64, FOVColour = Color3.fromRGB(231,84,128),
-        FOVFilled = false, FOVFillColour = Color3.fromRGB(231,84,128), FOVFillTransparency = 0.5,
-        ShowTargetLine = false, TargetLineColour = Color3.fromRGB(255,255,255), TargetLineOrigin = 'Screen Center',
-        Sticky = {Enabled = false, Target = nil}, MaxDistance = 250, HvH = false, VisibleCheck = true,
-        HitChance = 100, Selected = nil, SelectedPart = nil, TargetPart = {"Head"}, UseFOV = false,
-        Checks = {Wall = true, Knock = true, Team = false}, Ignored = {Teams = {}, Players = {G.LP}}, IgnoreFriends = false
-    }
-    local SilentDraw = {Circle = nil, CircleFill = nil, TargetLine = nil}
-    
-    SilentDraw.Circle = Drawing.new("Circle")
-    SilentDraw.Circle.Transparency, SilentDraw.Circle.Thickness, SilentDraw.Circle.Color, SilentDraw.Circle.Filled, SilentDraw.Circle.NumSides = 1, 2, Silent.FOVColour, false, Silent.FOVSides
-    SilentDraw.CircleFill = Drawing.new("Circle")
-    SilentDraw.CircleFill.Transparency, SilentDraw.CircleFill.Thickness, SilentDraw.CircleFill.Color, SilentDraw.CircleFill.Filled, SilentDraw.CircleFill.NumSides = Silent.FOVFillTransparency, 1, Silent.FOVFillColour, true, Silent.FOVSides
-    SilentDraw.TargetLine = Drawing.new("Line")
-    SilentDraw.TargetLine.Thickness, SilentDraw.TargetLine.Color, SilentDraw.TargetLine.Visible, SilentDraw.TargetLine.Transparency = 1.5, Silent.TargetLineColour, false, 1
-    
-    local function SilentUpdateFOV()
-        if not SilentDraw.Circle then return end
-        local pos = Vector2.new(G.Mouse.X, G.Mouse.Y + G.GS:GetGuiInset().Y)
-        local radius = Silent.FOV * 3
-        SilentDraw.Circle.Visible, SilentDraw.Circle.Radius, SilentDraw.Circle.Position, SilentDraw.Circle.NumSides, SilentDraw.Circle.Color = Silent.ShowFOV, radius, pos, Silent.FOVSides, Silent.FOVColour
-        if SilentDraw.CircleFill then
-            SilentDraw.CircleFill.Visible, SilentDraw.CircleFill.Radius, SilentDraw.CircleFill.Position, SilentDraw.CircleFill.NumSides, SilentDraw.CircleFill.Color, SilentDraw.CircleFill.Transparency = Silent.ShowFOV and Silent.FOVFilled, radius, pos, Silent.FOVSides, Silent.FOVFillColour, Silent.FOVFillTransparency
-        end
-        return SilentDraw.Circle
+ -- ============================================
+-- SILENT AIM (UPDATED WITH MEKO MECHANICS)
+-- ============================================
+local Silent = {
+    Enabled = false, ShowFOV = false, FOV = 65, FOVSides = 64, FOVColour = Color3.fromRGB(231,84,128),
+    FOVFilled = false, FOVFillColour = Color3.fromRGB(231,84,128), FOVFillTransparency = 0.5,
+    ShowTargetLine = false, TargetLineColour = Color3.fromRGB(255,255,255), TargetLineOrigin = 'Screen Center',
+    Sticky = {Enabled = false, Target = nil}, MaxDistance = 250, HvH = false, VisibleCheck = true,
+    HitChance = 100, Selected = nil, SelectedPart = nil, TargetPart = {"Head"}, UseFOV = false,
+    Checks = {Wall = true, Knock = true, Team = false}, Ignored = {Teams = {}, Players = {G.LP}}, IgnoreFriends = false,
+    Prediction = 0.13
+}
+local SilentDraw = {Circle = nil, CircleFill = nil, TargetLine = nil}
+
+SilentDraw.Circle = Drawing.new("Circle")
+SilentDraw.Circle.Transparency, SilentDraw.Circle.Thickness, SilentDraw.Circle.Color, SilentDraw.Circle.Filled, SilentDraw.Circle.NumSides = 1, 2, Silent.FOVColour, false, Silent.FOVSides
+SilentDraw.CircleFill = Drawing.new("Circle")
+SilentDraw.CircleFill.Transparency, SilentDraw.CircleFill.Thickness, SilentDraw.CircleFill.Color, SilentDraw.CircleFill.Filled, SilentDraw.CircleFill.NumSides = Silent.FOVFillTransparency, 1, Silent.FOVFillColour, true, Silent.FOVSides
+SilentDraw.TargetLine = Drawing.new("Line")
+SilentDraw.TargetLine.Thickness, SilentDraw.TargetLine.Color, SilentDraw.TargetLine.Visible, SilentDraw.TargetLine.Transparency = 1.5, Silent.TargetLineColour, false, 1
+
+local function SilentUpdateFOV()
+    if not SilentDraw.Circle then return end
+    local pos = Vector2.new(G.Mouse.X, G.Mouse.Y + G.GS:GetGuiInset().Y)
+    local radius = Silent.FOV * 3
+    SilentDraw.Circle.Visible, SilentDraw.Circle.Radius, SilentDraw.Circle.Position, SilentDraw.Circle.NumSides, SilentDraw.Circle.Color = Silent.ShowFOV, radius, pos, Silent.FOVSides, Silent.FOVColour
+    if SilentDraw.CircleFill then
+        SilentDraw.CircleFill.Visible, SilentDraw.CircleFill.Radius, SilentDraw.CircleFill.Position, SilentDraw.CircleFill.NumSides, SilentDraw.CircleFill.Color, SilentDraw.CircleFill.Transparency = Silent.ShowFOV and Silent.FOVFilled, radius, pos, Silent.FOVSides, Silent.FOVFillColour, Silent.FOVFillTransparency
     end
-    
-    local function SilentUpdateTargetLine()
-        if not SilentDraw.TargetLine then return end
-        if Silent.ShowTargetLine and Silent.Selected and Silent.Selected ~= G.LP and Silent.SelectedPart then
-            local partPos, onScreen = G.C:WorldToViewportPoint(Silent.SelectedPart.Position)
-            if onScreen then
-                SilentDraw.TargetLine.Visible = true
-                SilentDraw.TargetLine.From = Silent.TargetLineOrigin == 'Mouse' and Vector2.new(G.Mouse.X, G.Mouse.Y + G.GS:GetGuiInset().Y) or Vector2.new(G.C.ViewportSize.X / 2, G.C.ViewportSize.Y / 2)
-                SilentDraw.TargetLine.To, SilentDraw.TargetLine.Color = Vector2.new(partPos.X, partPos.Y), Silent.TargetLineColour
-                return
+    return SilentDraw.Circle
+end
+
+local function SilentUpdateTargetLine()
+    if not SilentDraw.TargetLine then return end
+    if Silent.ShowTargetLine and Silent.Selected and Silent.Selected ~= G.LP and Silent.SelectedPart then
+        local partPos, onScreen = G.C:WorldToViewportPoint(Silent.SelectedPart.Position)
+        if onScreen then
+            SilentDraw.TargetLine.Visible = true
+            SilentDraw.TargetLine.From = Silent.TargetLineOrigin == 'Mouse' and Vector2.new(G.Mouse.X, G.Mouse.Y + G.GS:GetGuiInset().Y) or Vector2.new(G.C.ViewportSize.X / 2, G.C.ViewportSize.Y / 2)
+            SilentDraw.TargetLine.To, SilentDraw.TargetLine.Color = Vector2.new(partPos.X, partPos.Y), Silent.TargetLineColour
+            return
+        end
+    end
+    SilentDraw.TargetLine.Visible = false
+end
+
+local function SilentCalcChance(pct) return math.random() <= pct / 100 end
+
+-- IMPROVED VISIBILITY CHECK
+local function SilentIsPartVisible(Part, PartDescendant)
+    local char = G.LP.Character
+    local params = RaycastParams.new()
+    params.FilterType, params.FilterDescendantsInstances = Enum.RaycastFilterType.Blacklist, {char, G.C, PartDescendant}
+    params.IgnoreWater = true
+    local result = G.W:Raycast(G.C.CFrame.Position, Part.Position - G.C.CFrame.Position, params)
+    return result == nil
+end
+
+-- IMPROVED PREDICTION
+local function SilentGetPing()
+    local Ok, Ping = pcall(function()
+        return game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
+    end)
+    if not Ok or typeof(Ping) ~= "number" then
+        return 60
+    end
+    return Ping
+end
+
+local function SilentPredicted(Part)
+    if not Part then return nil end
+    local Ping = SilentGetPing()
+    local PredTime = Silent.Prediction + (math.clamp(Ping, 1, 200) - 60) * 0.00015
+    return Part.Position + Part.AssemblyLinearVelocity * math.clamp(PredTime, 0, 0.3)
+end
+
+local function SilentIsFriend(p)
+    if not p then return false end
+    local ok, isF = pcall(function() return G.LP:IsFriendsWith(p.UserId) end)
+    return ok and isF
+end
+
+local function SilentIsIgnored(p)
+    if Silent.IgnoreFriends and SilentIsFriend(p) then return true end
+    for _, ignored in ipairs(Silent.Ignored.Players) do if ignored == p then return true end end
+    for _, team in ipairs(Silent.Ignored.Teams) do if p.Team == team[1] then return true end end
+    return false
+end
+
+-- IMPROVED TARGET PART GETTING
+local function SilentGetTargetPart(char)
+    if not char then return nil end
+    local parts = {}
+    if typeof(Silent.TargetPart) == "string" then
+        if Silent.TargetPart == "All" then
+            for _, v in ipairs(char:GetChildren()) do
+                if v:IsA("BasePart") then table.insert(parts, v) end
             end
+        else
+            local p = char:FindFirstChild(Silent.TargetPart)
+            if p then table.insert(parts, p) end
         end
-        SilentDraw.TargetLine.Visible = false
-    end
-    
-    local function SilentCalcChance(pct) return math.random() <= pct / 100 end
-    
-    local function SilentIsPartVisible(Part, PartDescendant)
-        local char = G.LP.Character
-        local params = RaycastParams.new()
-        params.FilterType, params.FilterDescendantsInstances = Enum.RaycastFilterType.Blacklist, {char, G.C}
-        local result = G.W:Raycast(G.C.CFrame.Position, Part.Position - G.C.CFrame.Position, params)
-        return result == nil or result.Instance:IsDescendantOf(PartDescendant)
-    end
-    
-    local function SilentIsFriend(p)
-        if not p then return false end
-        local ok, isF = pcall(function() return G.LP:IsFriendsWith(p.UserId) end)
-        return ok and isF
-    end
-    
-    local function SilentIsIgnored(p)
-        if Silent.IgnoreFriends and SilentIsFriend(p) then return true end
-        for _, ignored in ipairs(Silent.Ignored.Players) do if ignored == p then return true end end
-        for _, team in ipairs(Silent.Ignored.Teams) do if p.Team == team[1] then return true end end
-        return false
-    end
-    
-    local function SilentGetClosestTargetPartToCursor(char)
-        local closestPart, shortest = nil, math.huge
-        local function CheckPart(part)
-            if typeof(part) == "string" then part = char:FindFirstChild(part) end
-            if not part then return end
-            local pos, onScreen = G.C:WorldToViewportPoint(part.Position)
-            if not onScreen then return end
-            local dist = (Vector2.new(pos.X, pos.Y - G.GS:GetGuiInset().Y) - Vector2.new(G.Mouse.X, G.Mouse.Y)).Magnitude
-            if dist < shortest then shortest, closestPart = dist, part end
+    elseif typeof(Silent.TargetPart) == "table" then
+        for _, name in ipairs(Silent.TargetPart) do
+            local p = char:FindFirstChild(name)
+            if p then table.insert(parts, p) end
         end
-        if typeof(Silent.TargetPart) == "string" and Silent.TargetPart == "All" then
-            for _, v in ipairs(char:GetChildren()) do if v:IsA("BasePart") then CheckPart(v) end end
-        elseif typeof(Silent.TargetPart) == "string" then CheckPart(Silent.TargetPart)
-        elseif typeof(Silent.TargetPart) == "table" then for _, name in ipairs(Silent.TargetPart) do CheckPart(name) end end
-        return closestPart
     end
-    
-    local function SilentGetClosestPlayer()
-        if Silent.Sticky.Enabled and Silent.Sticky.Target then
-            local p = Silent.Sticky.Target
-            if not p or p.Parent ~= G.P then Silent.Sticky.Target = nil
-            else
-                local char = p.Character
-                if char and isValidTarget(p, Silent.Checks) then
-                    local part = char:FindFirstChild(Silent.TargetPart[1] or "Head")
-                    if part then Silent.Selected, Silent.SelectedPart = p, part return end
-                end
-                Silent.Selected, Silent.SelectedPart = nil, nil
-                return
-            end
-        end
-        if not SilentCalcChance(Silent.HitChance) then Silent.Selected, Silent.SelectedPart = G.LP, nil return end
-        local closestPlayer, targetPart, shortest = nil, nil, math.huge
-        for _, p in ipairs(G.P:GetPlayers()) do
+    -- Fallback to Head or HumanoidRootPart
+    if #parts == 0 then
+        local h = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+        if h then table.insert(parts, h) end
+    end
+    return parts
+end
+
+-- IMPROVED CLOSEST PLAYER WITH RANKING
+local function SilentGetClosestPlayer()
+    if Silent.Sticky.Enabled and Silent.Sticky.Target then
+        local p = Silent.Sticky.Target
+        if not p or p.Parent ~= G.P then Silent.Sticky.Target = nil
+        else
             local char = p.Character
-            if not SilentIsIgnored(p) and char then
-                if not Silent.HvH and Silent.MaxDistance > 0 then
-                    local myHRP = G.LP.Character and G.LP.Character:FindFirstChild("HumanoidRootPart")
-                    local targetHRP = char:FindFirstChild("HumanoidRootPart")
-                    if myHRP and targetHRP and (myHRP.Position - targetHRP.Position).Magnitude > Silent.MaxDistance then continue end
+            if char and isValidTarget(p, Silent.Checks) then
+                local parts = SilentGetTargetPart(char)
+                for _, part in ipairs(parts) do
+                    if Silent.Checks.Wall and not SilentIsPartVisible(part, char) then continue end
+                    Silent.Selected, Silent.SelectedPart = p, part
+                    return
                 end
-                if not isValidTarget(p, Silent.Checks) then continue end
-                local part = SilentGetClosestTargetPartToCursor(char)
-                if part then
-                    local pos = G.C:WorldToViewportPoint(part.Position)
-                    local dist = (Vector2.new(pos.X, pos.Y - G.GS:GetGuiInset().Y) - Vector2.new(G.Mouse.X, G.Mouse.Y)).Magnitude
-                    if (not Silent.UseFOV or SilentDraw.Circle.Radius > dist) and dist < shortest then
-                        if Silent.Checks.Wall and not SilentIsPartVisible(part, char) then continue end
-                        closestPlayer, targetPart, shortest = p, part, dist
+            end
+            Silent.Selected, Silent.SelectedPart = nil, nil
+            return
+        end
+    end
+    if not SilentCalcChance(Silent.HitChance) then Silent.Selected, Silent.SelectedPart = nil, nil return end
+    
+    local mousePos = G.U:GetMouseLocation()
+    local origin = G.C.CFrame.Position
+    local myRoot = G.LP.Character and G.LP.Character:FindFirstChild("HumanoidRootPart")
+    if myRoot then origin = myRoot.Position end
+    
+    local closestPlayer, targetPart, bestScore = nil, nil, math.huge
+    
+    for _, p in ipairs(G.P:GetPlayers()) do
+        local char = p.Character
+        if not SilentIsIgnored(p) and char and isValidTarget(p, Silent.Checks) then
+            -- Distance check
+            if not Silent.HvH and Silent.MaxDistance > 0 then
+                local targetRoot = char:FindFirstChild("HumanoidRootPart")
+                if myRoot and targetRoot and (myRoot.Position - targetRoot.Position).Magnitude > Silent.MaxDistance then
+                    continue
+                end
+            end
+            
+            local parts = SilentGetTargetPart(char)
+            for _, part in ipairs(parts) do
+                -- Visibility
+                if Silent.Checks.Wall and not SilentIsPartVisible(part, char) then continue end
+                
+                -- Prediction
+                local predPos = SilentPredicted(part)
+                if not predPos then predPos = part.Position end
+                
+                -- Screen position
+                local screenPos, onScreen = G.C:WorldToViewportPoint(predPos)
+                if not onScreen or screenPos.Z <= 0 then continue end
+                
+                -- FOV and distance ranking
+                local dist2D = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                if Silent.UseFOV and SilentDraw.Circle.Radius < dist2D then continue end
+                
+                -- Score: 2D distance + weighted 3D distance
+                local score = dist2D + ((origin - predPos).Magnitude * 0.45)
+                if score < bestScore then
+                    bestScore, closestPlayer, targetPart = score, p, part
+                end
+            end
+        end
+    end
+    
+    Silent.Selected, Silent.SelectedPart = closestPlayer, targetPart
+end
+
+-- HOOK THE MOUSE
+local mt = getrawmetatable(game)
+local oldIndex = mt.__index
+setreadonly(mt, false)
+mt.__index = function(t, k)
+    if t == G.Mouse and (k == "Hit" or k == "Target") and Silent.Enabled and Silent.SelectedPart then
+        if Silent.Selected and not isValidTarget(Silent.Selected, Silent.Checks) then
+            Silent.Selected, Silent.SelectedPart = nil, nil
+            return oldIndex(t, k)
+        end
+        if k == "Hit" then
+            local predPos = SilentPredicted(Silent.SelectedPart)
+            local pos = predPos or Silent.SelectedPart.Position
+            if getgenv().BypassAimView then
+                local jitter = Vector3.new(math.random(-8,8)/1000, math.random(-8,8)/1000, math.random(-8,8)/1000)
+                return CFrame.new(pos + jitter)
+            end
+            return CFrame.new(pos)
+        elseif k == "Target" then return Silent.SelectedPart end
+    end
+    return oldIndex(t, k)
+end
+setreadonly(mt, true)
+
+-- HOOK GUNHANDLER FOR BETTER AIM
+pcall(function()
+    local Modules = G.RS:FindFirstChild("Modules")
+    local GunMod = Modules and Modules:FindFirstChild("GunHandler")
+    if not GunMod then return end
+    local Ok, Gun = pcall(require, GunMod)
+    if not Ok or type(Gun) ~= "table" then return end
+    
+    -- Hook GetAim
+    local GetAimKey = (type(Gun.GetAim) == "function" and "GetAim") or (type(Gun.getAim) == "function" and "getAim")
+    if GetAimKey then
+        local OldGetAim = Gun[GetAimKey]
+        Gun[GetAimKey] = function(Origin, ...)
+            if Silent.Enabled and Silent.SelectedPart then
+                local predPos = SilentPredicted(Silent.SelectedPart)
+                if predPos then
+                    local delta = predPos - Origin
+                    if delta.Magnitude > 0.001 then
+                        return delta.Unit, delta.Magnitude
                     end
                 end
             end
+            if OldGetAim then return OldGetAim(Origin, ...) end
         end
-        Silent.Selected, Silent.SelectedPart = closestPlayer, targetPart
     end
     
-    local mt = getrawmetatable(game)
-    local oldIndex = mt.__index
-    setreadonly(mt, false)
-    mt.__index = function(t, k)
-        if t == G.Mouse and (k == "Hit" or k == "Target") and Silent.Enabled and Silent.SelectedPart then
-            if Silent.Selected and not isValidTarget(Silent.Selected, Silent.Checks) then
-                Silent.Selected, Silent.SelectedPart = nil, nil
-                return oldIndex(t, k)
-            end
-            if k == "Hit" then
-                if getgenv().BypassAimView then
-                    local jitter = Vector3.new(math.random(-8,8)/1000, math.random(-8,8)/1000, math.random(-8,8)/1000)
-                    return Silent.SelectedPart.CFrame + jitter
+    -- Hook Shoot
+    local ShootKey = (type(Gun.Shoot) == "function" and "Shoot") or (type(Gun.shoot) == "function" and "shoot")
+    if ShootKey then
+        local OldShoot = Gun[ShootKey]
+        Gun[ShootKey] = function(Data)
+            if Silent.Enabled and Silent.SelectedPart and type(Data) == "table" then
+                local predPos = SilentPredicted(Silent.SelectedPart)
+                local pos = predPos or Silent.SelectedPart.Position
+                if pos then
+                    Data.AimPosition = pos
+                    Data.aimPosition = pos
+                    Data.Hit = nil
+                    Data.Instance = nil
                 end
-                return Silent.SelectedPart.CFrame
-            elseif k == "Target" then return Silent.SelectedPart end
+            end
+            if OldShoot then return OldShoot(Data) end
         end
-        return oldIndex(t, k)
     end
-    setreadonly(mt, true)
-    
-    G.R.Heartbeat:Connect(function() pcall(function() SilentUpdateFOV() SilentUpdateTargetLine() SilentGetClosestPlayer() end) end)
-    
-    -- SILENT MENU
-    Sections.LegitRight:Toggle({Name = 'silent', Flag = 'silent_aim_toggle', Default = false, Callback = function(v) Silent.Enabled = v end})
-    
-    Sections.LegitRight:Toggle({Name = 'ignore friends', Flag = 'silent_ignore_friends', Default = false, Callback = function(v) Silent.IgnoreFriends = v end})
-    Sections.LegitRight:Dropdown({Name = 'checks', Flag = 'silent_checks', Items = {'Wall Check','Knock Check','Team Check'}, Default = {'Wall Check','Knock Check'}, Multi = true, Callback = function(v)
-        Silent.Checks.Wall, Silent.Checks.Knock = table.find(v,'Wall Check')~=nil, table.find(v,'Knock Check')~=nil
-        local team = table.find(v,'Team Check')~=nil
-        Silent.Checks.Team = team
-        if team then for _, team in ipairs(Silent.Ignored.Teams) do if team[1] == G.LP.Team then return end end table.insert(Silent.Ignored.Teams, {G.LP.Team, G.LP.TeamColor})
-        else for i, team in ipairs(Silent.Ignored.Teams) do if team[1] == G.LP.Team then table.remove(Silent.Ignored.Teams, i) break end end end
-    end})
-    Sections.LegitRight:Slider({Name = 'max distance', Flag = 'silent_max_distance', Default = 250, Min = 0, Max = 1000, Decimals = 1, Suffix = ' studs', Callback = function(v) Silent.MaxDistance = v end})
-    Sections.LegitRight:Toggle({Name = 'hvh', Flag = 'silent_hvh_toggle', Default = false, Callback = function(v) Silent.HvH = v end})
-    Sections.LegitRight:Toggle({Name = 'fov', Flag = 'silent_fov_toggle', Default = false, Callback = function(v) Silent.UseFOV = v end})
-    local ShowFOVToggle = Sections.LegitRight:Toggle({Name = 'show fov', Flag = 'show_silent_fov', Default = false, Callback = function(v) Silent.ShowFOV = v end})
-    ShowFOVToggle:Colorpicker({Flag = 'silent_fov_color', Default = Color3.fromRGB(231,84,128), Alpha = 0, Callback = function(c,a) Silent.FOVColour = c end})
-    Sections.LegitRight:Slider({Name = 'fov', Flag = 'silent_fov', Default = 0.13, Min = 0, Max = 1, Decimals = 0.01, Callback = function(v) Silent.FOV = v * 500 end})
-    local FillFOVToggle = Sections.LegitRight:Toggle({Name = 'fill fov', Flag = 'silent_fov_fill_toggle', Default = false, Callback = function(v) Silent.FOVFilled = v end})
-    FillFOVToggle:Colorpicker({Flag = 'silent_fov_fill_color', Default = Color3.fromRGB(231,84,128), Alpha = 0, Callback = function(c,a) Silent.FOVFillColour = c end})
-    Sections.LegitRight:Slider({Name = 'fill transparency', Flag = 'silent_fov_fill_transparency', Default = 0.5, Min = 0, Max = 1, Decimals = 0.01, Callback = function(v) Silent.FOVFillTransparency = v end})
-    local TargetLineToggle = Sections.LegitRight:Toggle({Name = 'target line', Flag = 'silent_target_line', Default = false, Callback = function(v) Silent.ShowTargetLine = v end})
-    TargetLineToggle:Colorpicker({Flag = 'silent_target_line_color', Default = Color3.fromRGB(255,255,255), Alpha = 0, Callback = function(c,a) Silent.TargetLineColour = c end})
-    Sections.LegitRight:Dropdown({Name = 'target line origin', Flag = 'silent_target_line_origin', Items = {'Screen Center','Mouse'}, Default = 'Screen Center', Multi = false, Callback = function(v) Silent.TargetLineOrigin = v end})
-    local StickyToggle = Sections.LegitRight:Toggle({Name = 'sticky', Flag = 'silent_sticky_toggle', Default = false, Callback = function(v)
-        Silent.Sticky.Enabled = v
-        if v and Silent.Selected and Silent.Selected ~= G.LP then Silent.Sticky.Target = Silent.Selected else Silent.Sticky.Target, Silent.Selected, Silent.SelectedPart = nil, nil, nil end
-    end})
-    StickyToggle:Keybind({Flag = 'silent_sticky_key', Default = Enum.KeyCode.T, Mode = 'Toggle', Callback = function(s)
-        Silent.Sticky.Enabled = s
-        if s and Silent.Selected and Silent.Selected ~= G.LP then Silent.Sticky.Target = Silent.Selected else Silent.Sticky.Target, Silent.Selected, Silent.SelectedPart = nil, nil, nil end
-    end})
-    Sections.LegitRight:Slider({Name = 'Prediction Time', Flag = 'silent_prediction_time', Default = 0.13, Min = 0, Max = 1, Decimals = 0.01, Callback = function(v) getgenv().Prediction = v end})
+end)
+
+-- HEARTBEAT LOOP
+G.R.Heartbeat:Connect(function() 
+    pcall(function() 
+        SilentUpdateFOV() 
+        SilentUpdateTargetLine() 
+        SilentGetClosestPlayer() 
+    end) 
+end)
+
+-- SILENT MENU
+Sections.LegitRight:Toggle({Name = 'silent', Flag = 'silent_aim_toggle', Default = false, Callback = function(v) Silent.Enabled = v end})
+
+Sections.LegitRight:Toggle({Name = 'ignore friends', Flag = 'silent_ignore_friends', Default = false, Callback = function(v) Silent.IgnoreFriends = v end})
+Sections.LegitRight:Dropdown({Name = 'checks', Flag = 'silent_checks', Items = {'Wall Check','Knock Check','Team Check'}, Default = {'Wall Check','Knock Check'}, Multi = true, Callback = function(v)
+    Silent.Checks.Wall, Silent.Checks.Knock = table.find(v,'Wall Check')~=nil, table.find(v,'Knock Check')~=nil
+    local team = table.find(v,'Team Check')~=nil
+    Silent.Checks.Team = team
+    if team then 
+        for _, team in ipairs(Silent.Ignored.Teams) do 
+            if team[1] == G.LP.Team then return end 
+        end 
+        table.insert(Silent.Ignored.Teams, {G.LP.Team, G.LP.TeamColor})
+    else 
+        for i, team in ipairs(Silent.Ignored.Teams) do 
+            if team[1] == G.LP.Team then 
+                table.remove(Silent.Ignored.Teams, i) 
+                break 
+            end 
+        end 
+    end
+end})
+Sections.LegitRight:Slider({Name = 'max distance', Flag = 'silent_max_distance', Default = 250, Min = 0, Max = 1000, Decimals = 1, Suffix = ' studs', Callback = function(v) Silent.MaxDistance = v end})
+Sections.LegitRight:Toggle({Name = 'hvh', Flag = 'silent_hvh_toggle', Default = false, Callback = function(v) Silent.HvH = v end})
+Sections.LegitRight:Toggle({Name = 'fov', Flag = 'silent_fov_toggle', Default = false, Callback = function(v) Silent.UseFOV = v end})
+local ShowFOVToggle = Sections.LegitRight:Toggle({Name = 'show fov', Flag = 'show_silent_fov', Default = false, Callback = function(v) Silent.ShowFOV = v end})
+ShowFOVToggle:Colorpicker({Flag = 'silent_fov_color', Default = Color3.fromRGB(231,84,128), Alpha = 0, Callback = function(c,a) Silent.FOVColour = c end})
+Sections.LegitRight:Slider({Name = 'fov', Flag = 'silent_fov', Default = 0.13, Min = 0, Max = 1, Decimals = 0.01, Callback = function(v) Silent.FOV = v * 500 end})
+local FillFOVToggle = Sections.LegitRight:Toggle({Name = 'fill fov', Flag = 'silent_fov_fill_toggle', Default = false, Callback = function(v) Silent.FOVFilled = v end})
+FillFOVToggle:Colorpicker({Flag = 'silent_fov_fill_color', Default = Color3.fromRGB(231,84,128), Alpha = 0, Callback = function(c,a) Silent.FOVFillColour = c end})
+Sections.LegitRight:Slider({Name = 'fill transparency', Flag = 'silent_fov_fill_transparency', Default = 0.5, Min = 0, Max = 1, Decimals = 0.01, Callback = function(v) Silent.FOVFillTransparency = v end})
+local TargetLineToggle = Sections.LegitRight:Toggle({Name = 'target line', Flag = 'silent_target_line', Default = false, Callback = function(v) Silent.ShowTargetLine = v end})
+TargetLineToggle:Colorpicker({Flag = 'silent_target_line_color', Default = Color3.fromRGB(255,255,255), Alpha = 0, Callback = function(c,a) Silent.TargetLineColour = c end})
+Sections.LegitRight:Dropdown({Name = 'target line origin', Flag = 'silent_target_line_origin', Items = {'Screen Center','Mouse'}, Default = 'Screen Center', Multi = false, Callback = function(v) Silent.TargetLineOrigin = v end})
+local StickyToggle = Sections.LegitRight:Toggle({Name = 'sticky', Flag = 'silent_sticky_toggle', Default = false, Callback = function(v)
+    Silent.Sticky.Enabled = v
+    if v and Silent.Selected and Silent.Selected ~= G.LP then 
+        Silent.Sticky.Target = Silent.Selected 
+    else 
+        Silent.Sticky.Target, Silent.Selected, Silent.SelectedPart = nil, nil, nil 
+    end
+end})
+StickyToggle:Keybind({Flag = 'silent_sticky_key', Default = Enum.KeyCode.T, Mode = 'Toggle', Callback = function(s)
+    Silent.Sticky.Enabled = s
+    if s and Silent.Selected and Silent.Selected ~= G.LP then 
+        Silent.Sticky.Target = Silent.Selected 
+    else 
+        Silent.Sticky.Target, Silent.Selected, Silent.SelectedPart = nil, nil, nil 
+    end
+end})
+Sections.LegitRight:Slider({Name = 'Prediction Time', Flag = 'silent_prediction_time', Default = 0.13, Min = 0, Max = 1, Decimals = 0.01, Callback = function(v) Silent.Prediction = v getgenv().Prediction = v end})
+Sections.LegitRight:Dropdown({Name = 'target part', Flag = 'silent_target_part', Items = {'Head','HumanoidRootPart','UpperTorso','LowerTorso','Torso','All'}, Default = {'Head'}, Multi = true, Callback = function(v) Silent.TargetPart = v or {"Head"} end})
     
     -- ============================================
     -- RAGE LEFT
@@ -918,257 +1054,7 @@ Sections.WeaponsLeft:Slider({
 
 
     
-    -- ============================================
-    -- RAGE TARGET
-    -- ============================================
-    local Target = {Enabled = false, AutoKill = false, MultiKill = false, MultiTargets = {}, CurrentTarget = nil, TargetLine = false, LineColor = Color3.fromRGB(255,0,0)}
-    local selectedTarget, autoKillConnection, multiKillConnection, targetLine = nil, nil, nil, nil
-    
-    local function disableWeaponModsForTarget()
-        if InfRangeEnabled then
-            InfRangeEnabled = false
-            for gun, _ in pairs(PatchedGuns) do CleanupGun(gun) end
-            pcall(function() if Sections.WeaponsLeft and Sections.WeaponsLeft.Toggles and Sections.WeaponsLeft.Toggles.inf_range then Sections.WeaponsLeft.Toggles.inf_range:Set(false) end end)
-        end
-        if RapidFireEnabled then
-            RapidFireEnabled = false
-            for tool, _ in pairs(RapidFireTools) do CleanupRapidFire(tool) end
-            RapidFireTools = {}
-            pcall(function() if Sections.WeaponsLeft and Sections.WeaponsLeft.Toggles and Sections.WeaponsLeft.Toggles.rapid_fire then Sections.WeaponsLeft.Toggles.rapid_fire:Set(false) end end)
-        end
-    end
-    
-    local function getCurrentGun()
-        local char = G.LP.Character
-        if not char then return nil end
-        local tool = char:FindFirstChildOfClass("Tool")
-        if tool and tool:FindFirstChild("Ammo") and tool:FindFirstChild("Handle") then return tool end
-        return nil
-    end
-    
-    local function getTargetFromCrosshair()
-        local mousePos = G.U:GetMouseLocation()
-        local closest, shortest = nil, 150
-        for _, p in ipairs(G.P:GetPlayers()) do
-            if p ~= G.LP and p.Character then
-                local hum = p.Character:FindFirstChildOfClass("Humanoid")
-                if hum and hum.Health > 0 then
-                    local be = p.Character:FindFirstChild("BodyEffects")
-                    local knocked = false
-                    if be then local ko = be:FindFirstChild("K.O") if ko and ko.Value == true then knocked = true end end
-                    if not knocked then
-                        local head = p.Character:FindFirstChild("Head")
-                        if head then
-                            local screenPos, onScreen = G.C:WorldToScreenPoint(head.Position)
-                            if onScreen then
-                                local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                                if dist < shortest then shortest, closest = dist, p end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-        return closest
-    end
-    
-    local function killTarget(player)
-        if not player or not player.Character or isRefilling then return false end
-        local char, bp = G.LP.Character, G.LP:FindFirstChild("Backpack")
-        if not char or not bp then return false end
-        local tool = getCurrentGun()
-        if not tool then
-            for _, child in ipairs(bp:GetChildren()) do
-                if child:IsA("Tool") and child:FindFirstChild("Ammo") and child:FindFirstChild("Handle") then
-                    child.Parent = char
-                    tool = child
-                    break
-                end
-            end
-            if not tool then return false end
-        end
-        local currentWeaponName, handle, ammo = tool.Name, tool:FindFirstChild("Handle"), tool:FindFirstChild("Ammo")
-        if not handle or not ammo or KillRemote == nil then return false end
-        if ammo.Value <= 0 and not isRefilling then requestAmmoRefill(tool) return false end
-        if isRefilling then return false end
-        local targetChar = player.Character
-        if not targetChar then return false end
-        local head = targetChar:FindFirstChild("Head")
-        if not head then return false end
-        local hum = targetChar:FindFirstChildOfClass("Humanoid")
-        if not hum or hum.Health <= 0 then return false end
-        local be = targetChar:FindFirstChild("BodyEffects")
-        if be then local ko = be:FindFirstChild("K.O") if ko and ko.Value == true then return false end end
-        local pos = head.Position
-        local pellets = {}
-        for _ = 1, 20 do pellets[#pellets + 1] = {AimPosition = pos, Result1 = pos, Result2 = head, Result3 = Vector3.yAxis} end
-        local rangeObj, dmgObj = tool:FindFirstChild("Range"), tool:FindFirstChild("Damage")
-        local range, dmg = rangeObj and rangeObj.Value or 200, dmgObj and dmgObj.Value or 50
-        tool.Enabled = true
-        if tool.Parent ~= char then tool.Parent = char end
-        local shots = tool.Name == "[Revolver]" and 3 or 8
-        for _ = 1, shots do KillRemote:FireServer("ShootGun", handle, handle.Position, pellets, nil, nil, nil, range, dmg) end
-        task.spawn(function() task.wait(1.0)
-            local attempts = 0
-            while attempts < 5 do attempts = attempts + 1 task.wait(0.1)
-                local char2 = G.LP.Character
-                if not char2 then continue end
-                if char2:FindFirstChild(currentWeaponName) then return end
-                local bp2 = G.LP:FindFirstChild("Backpack")
-                if bp2 then local tool2 = bp2:FindFirstChild(currentWeaponName) if tool2 then tool2.Parent = char2 return end end
-            end
-        end)
-        return true
-    end
-    
-    local function isValidTarget2(p)
-        if not p or p == G.LP or not p.Character then return false end
-        local hum = p.Character:FindFirstChildOfClass("Humanoid")
-        if not hum or hum.Health <= 0 then return false end
-        local be = p.Character:FindFirstChild("BodyEffects")
-        if be then local ko = be:FindFirstChild("K.O") if ko and ko.Value == true then return false end end
-        return true
-    end
-    
-    local function CreateTargetLine()
-        if not targetLine then
-            local success, line = pcall(function() return Drawing.new("Line") end)
-            if success and line then targetLine = line targetLine.Thickness = 2 targetLine.Color = Target.LineColor targetLine.Transparency = 1 targetLine.Visible = false return targetLine end
-        end
-        return targetLine
-    end
-    
-    local function UpdateTargetLine2()
-        if not Target.Enabled or not Target.TargetLine or not selectedTarget then
-            if targetLine then targetLine.Visible = false end
-            return
-        end
-        if not isValidTarget2(selectedTarget) then if targetLine then targetLine.Visible = false end return end
-        local head = selectedTarget.Character:FindFirstChild("Head")
-        if not head then if targetLine then targetLine.Visible = false end return end
-        local screenPos, onScreen = G.C:WorldToScreenPoint(head.Position)
-        if not onScreen then if targetLine then targetLine.Visible = false end return end
-        local mousePos = G.U:GetMouseLocation()
-        local line = CreateTargetLine()
-        if line then line.From = Vector2.new(mousePos.X, mousePos.Y) line.To = Vector2.new(screenPos.X, screenPos.Y) line.Color = Target.LineColor line.Visible = true end
-    end
-    
-    local function StartAutoKill()
-        if autoKillConnection then return end
-        autoKillConnection = G.R.Heartbeat:Connect(function()
-            if not Target.AutoKill or not Target.Enabled or not selectedTarget then return end
-            if isValidTarget2(selectedTarget) then
-                local tool = getCurrentGun()
-                if tool then local ammo = tool:FindFirstChild("Ammo") if ammo and ammo.Value <= 0 then requestAmmoRefill(tool) return end end
-                killTarget(selectedTarget)
-            end
-            UpdateTargetLine2()
-        end)
-    end
-    
-    local function StopAutoKill()
-        if autoKillConnection then autoKillConnection:Disconnect() autoKillConnection = nil end
-        if targetLine then targetLine.Visible = false end
-    end
-    
-    local function StartMultiKill()
-        if multiKillConnection then return end
-        multiKillConnection = G.R.Heartbeat:Connect(function()
-            if not Target.MultiKill or not Target.Enabled or not Target.MultiTargets or #Target.MultiTargets == 0 then return end
-            local tool = getCurrentGun()
-            if tool then local ammo = tool:FindFirstChild("Ammo") if ammo and ammo.Value <= 0 then requestAmmoRefill(tool) return end end
-            for _, playerName in ipairs(Target.MultiTargets) do
-                local player = G.P:FindFirstChild(playerName)
-                if player and isValidTarget2(player) then killTarget(player) end
-            end
-            UpdateTargetLine2()
-        end)
-    end
-    
-    local function StopMultiKill()
-        if multiKillConnection then multiKillConnection:Disconnect() multiKillConnection = nil end
-        if targetLine then targetLine.Visible = false end
-    end
-    
-    G.R.Heartbeat:Connect(function()
-        if not Target.Enabled or isRefilling then return end
-        local tool = getCurrentGun()
-        if not tool then return end
-        local ammo = tool:FindFirstChild("Ammo")
-        if not ammo then return end
-        if tool.Parent == G.LP.Character and ammo.Value <= 0 and not ammo:GetAttribute("ZeeKillRefillRequested") then requestAmmoRefill(tool) end
-    end)
-    
-    G.U.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed or not Target.Enabled or isRefilling then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton1 and selectedTarget and isValidTarget2(selectedTarget) then killTarget(selectedTarget) end
-    end)
-    
-    G.R.RenderStepped:Connect(function()
-        if Target.Enabled and Target.TargetLine then UpdateTargetLine2()
-        elseif targetLine then targetLine.Visible = false end
-    end)
-    
-    local function GetPlayerNames()
-        local t = {}
-        for _, p in ipairs(G.P:GetPlayers()) do if p ~= G.LP then table.insert(t, p.Name) end end
-        return t
-    end
-    
-    local TargetToggle = Sections.RageTarget:Toggle({Name = 'target', Flag = 'target_system', Default = false, Callback = function(v)
-        Target.Enabled = v
-        if v then disableWeaponModsForTarget()
-        else selectedTarget = nil StopAutoKill() StopMultiKill() if targetLine then targetLine.Visible = false end end
-    end})
-    
-    TargetToggle:Keybind({Flag = 'target_bind', Mode = 'Toggle', Callback = function(s)
-        if s then
-            disableWeaponModsForTarget()
-            local target = getTargetFromCrosshair()
-            if target and isValidTarget2(target) then
-                selectedTarget = target
-                if Target.AutoKill then
-                    local tool = getCurrentGun()
-                    if tool then local ammo = tool:FindFirstChild("Ammo") if ammo and ammo.Value <= 0 then requestAmmoRefill(tool) return end end
-                    killTarget(selectedTarget)
-                end
-            end
-        else selectedTarget = nil StopAutoKill() if targetLine then targetLine.Visible = false end end
-    end})
-    
-    Sections.RageTarget:Toggle({Name = 'auto kill', Flag = 'auto_kill_target', Default = false, Callback = function(v)
-        Target.AutoKill = v
-        if v and Target.Enabled then StartAutoKill()
-            if selectedTarget and isValidTarget2(selectedTarget) then killTarget(selectedTarget) end
-        else StopAutoKill() end
-    end})
-    
-    Sections.RageTarget:Toggle({Name = 'multi kill', Flag = 'multi_kill_targets', Default = false, Callback = function(v)
-        Target.MultiKill = v
-        if v and Target.Enabled then StartMultiKill() else StopMultiKill() end
-    end})
-    
-    local multiDropdown = Sections.RageTarget:Dropdown({Name = 'targets', Flag = 'kill_targets_list', Items = GetPlayerNames(), Default = {}, Multi = true, Callback = function(v) Target.MultiTargets = v or {} end})
-    
-    local function refreshMultiDropdown()
-        local names = GetPlayerNames()
-        if type(multiDropdown.Refresh) == "function" then multiDropdown:Refresh(names)
-        elseif type(multiDropdown.SetItems) == "function" then multiDropdown:SetItems(names)
-        elseif type(multiDropdown.SetValues) == "function" then multiDropdown:SetValues(names) end
-    end
-    G.P.PlayerAdded:Connect(refreshMultiDropdown)
-    G.P.PlayerRemoving:Connect(refreshMultiDropdown)
-    task.defer(function()
-        task.wait(0.1)
-        local inst = typeof(multiDropdown) == "Instance" and multiDropdown or (type(multiDropdown) == "table" and multiDropdown.Instance)
-        if inst then for _, d in ipairs(inst:GetDescendants()) do if d:IsA("GuiButton") then d.Activated:Connect(refreshMultiDropdown) break end end end
-    end)
-    
-    local LineToggle = Sections.RageTarget:Toggle({Name = 'target line', Flag = 'target_line', Default = false, Callback = function(v)
-        Target.TargetLine = v
-        if not v and targetLine then targetLine.Visible = false end
-    end})
-    LineToggle:Colorpicker({Flag = 'target_line_color', Default = Color3.fromRGB(255,0,0), Alpha = 0, Callback = function(c,a) Target.LineColor = c if targetLine then targetLine.Color = c end end})
+
     
     -- ============================================
 -- ESP (WHITE TEXT)
@@ -1820,204 +1706,7 @@ Sections.MovementLeft:Slider({Name = "fly speed", Flag = "fly_speed", Default = 
         end
     end)
     
-    -- ============================================
-    -- KILL ALL
-    -- ============================================
-    _KillAllEnabled = false
-    _KA_killAll = nil
-    do
-        local Kill = {Enabled = false, Auto = false, IgnoreFriends = false, Whitelist = {}}
-        local KillGuns = {["[Double-Barrel SG]"]=true, ["[Revolver]"]=true, ["[TacticalShotgun]"]=true}
-        local KillLoadout = {"[Double-Barrel SG]","[Revolver]","[TacticalShotgun]","None"}
-        local KillRefillActive, KillRefillGen, KillLoopConn = false, 0, nil
-        
-        local function KillFindRemote(name)
-            for _, obj in ipairs(G.RS:GetDescendants()) do if obj:IsA("RemoteEvent") and obj.Name:lower():find(name:lower(),1,true) then return obj end end
-            return nil
-        end
-        local KillRemote2 = KillFindRemote("MainGameEvent") or KillFindRemote("MainRemoteEvent")
-        local KillLoadoutRemote = KillFindRemote("Loadout")
-        
-        local function KillRequestAmmoRefill(tool, ammo)
-            if KillLoadoutRemote == nil or KillRefillActive or tool == nil or ammo == nil or ammo:GetAttribute("ZeeKillRefillRequested") then return false end
-            local char, bp = G.LP.Character, G.LP:FindFirstChild("Backpack")
-            if bp == nil then return false end
-            if ammo.Value > 3 then return false end
-            ammo:SetAttribute("ZeeKillRefillRequested", true)
-            KillRefillActive = true
-            local reqName, oldTools, eqTools, newTools, seen = tool.Name, {}, {}, {}, {}
-            for _, cont in ipairs({bp,char}) do
-                if cont then for _, item in ipairs(cont:GetChildren()) do
-                    if item:IsA("Tool") and KillGuns[item.Name] then
-                        oldTools[item] = true
-                        if item.Parent == char then eqTools[item.Name] = true end
-                    end
-                end end
-            end
-            local conns, stopped, deadline, lastAdd, gen = {}, false, os.clock()+2, os.clock(), KillRefillGen
-            local function stop()
-                if stopped then return end
-                stopped = true
-                for _, c in ipairs(conns) do c:Disconnect() end
-                if not newTools[reqName] and ammo.Parent then ammo:SetAttribute("ZeeKillRefillRequested", nil) end
-                KillRefillActive = false
-            end
-            local function accept(item)
-                if not item:IsA("Tool") or not KillGuns[item.Name] or oldTools[item] or seen[item] then return end
-                seen[item], lastAdd = true, os.clock()
-                local name = item.Name
-                local prev = newTools[name]
-                if prev and prev ~= item and prev.Parent then prev:Destroy() end
-                newTools[name] = item
-                for old in pairs(oldTools) do if old.Name == name and old.Parent then old:Destroy() end end
-                if eqTools[name] and char and item.Parent then item.Parent = char end
-            end
-            conns[1] = bp.ChildAdded:Connect(accept)
-            if char then conns[2] = char.ChildAdded:Connect(accept) end
-            KillLoadoutRemote:FireServer(KillLoadout)
-            local heartbeat = G.R.Heartbeat:Connect(function()
-                if gen ~= KillRefillGen then stop() return end
-                if os.clock() >= deadline or (next(newTools) and os.clock()-lastAdd >= 0.2) then stop() end
-            end)
-            return true
-        end
-        
-        local function KillUsableAmmo(tool, ammo)
-            if ammo.Value <= 0 then KillRequestAmmoRefill(tool, ammo) return false end
-            if not ammo:GetAttribute("ZeeKillAmmoWatching") then
-                ammo:SetAttribute("ZeeKillAmmoWatching", true)
-                local conn = ammo:GetPropertyChangedSignal("Value"):Connect(function()
-                    if ammo.Value <= 0 then conn:Disconnect() KillRequestAmmoRefill(tool, ammo) end
-                end)
-            end
-            return true
-        end
-        
-        local function KillGetGun(char, bp) return bp:FindFirstChild("[TacticalShotgun]") or (char and char:FindFirstChild("[TacticalShotgun]")) end
-        
-        local function KillShouldSkip(p)
-            if Kill.IgnoreFriends then local ok, isF = pcall(function() return G.LP:IsFriendsWith(p.UserId) end) if ok and isF then return true end end
-            if Kill.Whitelist and next(Kill.Whitelist) then for _, name in ipairs(Kill.Whitelist) do if p.Name == name then return true end end end
-            return false
-        end
-        
-        local function KillAll()
-            if not Kill.Enabled then return false end
-            local char, bp = G.LP.Character, G.LP:FindFirstChild("Backpack")
-            if char == nil or bp == nil then return false end
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            local tool = KillGetGun(char, bp)
-            local handle = tool and tool:FindFirstChild("Handle")
-            local ammo = tool and tool:FindFirstChild("Ammo")
-            if KillRemote2 == nil or hum == nil or tool == nil or handle == nil or ammo == nil then return false end
-            if not KillUsableAmmo(tool, ammo) then return false end
-            local pellets, targets = {}, 0
-            for _, p in ipairs(G.P:GetPlayers()) do
-                if p ~= G.LP and not KillShouldSkip(p) then
-                    local tc = p.Character
-                    if tc and tc.Parent then
-                        local th, head = tc:FindFirstChild("Humanoid"), tc:FindFirstChild("Head")
-                        if th and th.Health > 0 and head then
-                            local be, ko = tc:FindFirstChild("BodyEffects"), false
-                            if be then local koVal = be:FindFirstChild("K.O") if koVal and koVal.Value == true then ko = true end end
-                            if not ko then
-                                targets = targets + 1
-                                local pos = head.Position
-                                for _ = 1, 20 do pellets[#pellets+1] = {AimPosition=pos, Result1=pos, Result2=head, Result3=Vector3.yAxis} end
-                            end
-                        end
-                    end
-                end
-            end
-            if #pellets == 0 then return false end
-            local rangeObj, dmgObj = tool:FindFirstChild("Range"), tool:FindFirstChild("Damage")
-            local range, dmg = rangeObj and rangeObj.Value or 200, dmgObj and dmgObj.Value or 50
-            tool.Enabled = true
-            if tool.Parent ~= char then tool.Parent = char end
-            for _ = 1, 8 do KillRemote2:FireServer("ShootGun", handle, handle.Position, pellets, nil, nil, nil, range, dmg) end
-            if tool.Parent then tool.Parent = bp end
-            task.spawn(function()
-                task.wait(0.3)
-                local char2, bp2 = G.LP.Character, G.LP:FindFirstChild("Backpack")
-                if not char2 and not bp2 then return end
-                local tool2 = char2 and char2:FindFirstChildOfClass("Tool")
-                if tool2 and tool2:FindFirstChild("Ammo") then
-                    local ammo2 = tool2:FindFirstChild("Ammo")
-                    if ammo2.Value <= 3 and not ammo2:GetAttribute("ZeeKillRefillRequested") then KillRequestAmmoRefill(tool2, ammo2) end
-                end
-                if bp2 then for _, item in ipairs(bp2:GetChildren()) do
-                    if item:IsA("Tool") and KillGuns[item.Name] and item:FindFirstChild("Ammo") then
-                        local ammo2 = item:FindFirstChild("Ammo")
-                        if ammo2.Value <= 3 and not ammo2:GetAttribute("ZeeKillRefillRequested") then KillRequestAmmoRefill(item, ammo2) end
-                    end
-                end end
-            end)
-            return targets > 0
-        end
-        _KA_killAll = KillAll
-        
-        local function KillStartAutoLoop()
-            if KillLoopConn then return end
-            KillLoopConn = G.R.Heartbeat:Connect(function() if Kill.Enabled and Kill.Auto then KillAll() end end)
-        end
-        
-        local function KillStopAutoLoop()
-            if KillLoopConn then KillLoopConn:Disconnect() KillLoopConn = nil end
-        end
-        
-        local function KillDisableWeaponMods()
-            if InfRangeEnabled then
-                InfRangeEnabled = false
-                for gun, _ in pairs(PatchedGuns) do CleanupGun(gun) end
-                pcall(function() if Sections.WeaponsLeft and Sections.WeaponsLeft.Toggles and Sections.WeaponsLeft.Toggles.inf_range then Sections.WeaponsLeft.Toggles.inf_range:Set(false) end end)
-            end
-            if RapidFireEnabled then
-                RapidFireEnabled = false
-                for tool, _ in pairs(RapidFireTools) do CleanupRapidFire(tool) end
-                RapidFireTools = {}
-                pcall(function() if Sections.WeaponsLeft and Sections.WeaponsLeft.Toggles and Sections.WeaponsLeft.Toggles.rapid_fire then Sections.WeaponsLeft.Toggles.rapid_fire:Set(false) end end)
-            end
-        end
-        
-        local KillToggle = Sections.RageRight:Toggle({Name = 'kill all', Flag = 'Kill_All', Default = false, Callback = function(v)
-            Kill.Enabled = v
-            _KillAllEnabled = v
-            if v then KillDisableWeaponMods() if Kill.Auto then KillStartAutoLoop() end
-            else KillStopAutoLoop() end
-        end})
-        
-        Sections.RageRight:Toggle({Name = 'auto kill all', Flag = 'auto_kill_all', Default = false, Callback = function(v)
-            Kill.Auto = v
-            if v and Kill.Enabled then KillDisableWeaponMods() KillStartAutoLoop()
-            elseif not v then KillStopAutoLoop() end
-        end})
-        
-        KillToggle:Keybind({Flag = 'kill_all_bind', Mode = 'Hold', Callback = function(s) if s and Kill.Enabled and type(_KA_killAll) == "function" then _KA_killAll() end end})
-        
-        Sections.RageRight:Toggle({Name = 'ignore friends', Flag = 'ignore_friends', Default = false, Callback = function(v) Kill.IgnoreFriends = v end})
-        
-        local function KillGetNames()
-            local t = {}
-            for _, p in ipairs(G.P:GetPlayers()) do if p ~= G.LP then table.insert(t, p.Name) end end
-            return t
-        end
-        
-        local wlDropdown = Sections.RageRight:Dropdown({Name = 'whitelist players', Flag = 'whitelist_players', Items = KillGetNames(), Default = {}, Multi = true, Callback = function(v) Kill.Whitelist = v or {} end})
-        
-        local function KillRefreshWhitelist()
-            local names = KillGetNames()
-            if type(wlDropdown.Refresh) == "function" then wlDropdown:Refresh(names)
-            elseif type(wlDropdown.SetItems) == "function" then wlDropdown:SetItems(names)
-            elseif type(wlDropdown.SetValues) == "function" then wlDropdown:SetValues(names) end
-        end
-        G.P.PlayerAdded:Connect(KillRefreshWhitelist)
-        G.P.PlayerRemoving:Connect(KillRefreshWhitelist)
-        task.defer(function()
-            task.wait(0.1)
-            local inst = typeof(wlDropdown) == "Instance" and wlDropdown or (type(wlDropdown) == "table" and wlDropdown.Instance)
-            if inst then for _, d in ipairs(inst:GetDescendants()) do if d:IsA("GuiButton") then d.Activated:Connect(KillRefreshWhitelist) break end end end
-        end)
-    end
+ 
     
     -- ============================================
     -- SPECTATE
