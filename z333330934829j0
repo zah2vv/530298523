@@ -19,7 +19,6 @@ do
         Rage = Window:Page({Name = 'rage'}),
         Weapons = Window:Page({Name = 'weapons'}),
         World = Window:Page({Name = 'world'}),
-        
         Movement = Window:Page({Name = 'movement'})
     }
     
@@ -34,7 +33,6 @@ do
         WeaponsRight = Pages.Weapons:Section({Name = 'spread', Side = 2}),
         WorldLeft = Pages.World:Section({Name = 'view', Side = 1}),
         WorldRight = Pages.World:Section({Name = 'world', Side = 2}),
-        
         MovementLeft = Pages.Movement:Section({Name = 'self', Side = 1}),
         MovementRight = Pages.Movement:Section({Name = 'other', Side = 2})
     }
@@ -183,321 +181,321 @@ do
     FovColorLabel:Colorpicker({Name = 'color', Flag = 'fov_color', Default = Color3.fromRGB(255,0,0), Callback = function(c) AimState.Circle.Color = c end})
     Sections.LegitLeft:Slider({Name = 'Prediction Time', Flag = 'prediction_time', Default = 0.13, Min = 0, Max = 1, Decimals = 0.01})
     
- -- ============================================
--- SILENT AIM (UPDATED WITH MEKO MECHANICS)
--- ============================================
-local Silent = {
-    Enabled = false, ShowFOV = false, FOV = 65, FOVSides = 64, FOVColour = Color3.fromRGB(231,84,128),
-    FOVFilled = false, FOVFillColour = Color3.fromRGB(231,84,128), FOVFillTransparency = 0.5,
-    ShowTargetLine = false, TargetLineColour = Color3.fromRGB(255,255,255), TargetLineOrigin = 'Screen Center',
-    Sticky = {Enabled = false, Target = nil}, MaxDistance = 250, HvH = false, VisibleCheck = true,
-    HitChance = 100, Selected = nil, SelectedPart = nil, TargetPart = {"Head"}, UseFOV = false,
-    Checks = {Wall = true, Knock = true, Team = false}, Ignored = {Teams = {}, Players = {G.LP}}, IgnoreFriends = false,
-    Prediction = 0.13
-}
-local SilentDraw = {Circle = nil, CircleFill = nil, TargetLine = nil}
+    -- ============================================
+    -- SILENT AIM (UPDATED WITH MEKO MECHANICS)
+    -- ============================================
+    local Silent = {
+        Enabled = false, ShowFOV = false, FOV = 65, FOVSides = 64, FOVColour = Color3.fromRGB(231,84,128),
+        FOVFilled = false, FOVFillColour = Color3.fromRGB(231,84,128), FOVFillTransparency = 0.5,
+        ShowTargetLine = false, TargetLineColour = Color3.fromRGB(255,255,255), TargetLineOrigin = 'Screen Center',
+        Sticky = {Enabled = false, Target = nil}, MaxDistance = 250, HvH = false, VisibleCheck = true,
+        HitChance = 100, Selected = nil, SelectedPart = nil, TargetPart = {"Head"}, UseFOV = false,
+        Checks = {Wall = true, Knock = true, Team = false}, Ignored = {Teams = {}, Players = {G.LP}}, IgnoreFriends = false,
+        Prediction = 0.13
+    }
+    local SilentDraw = {Circle = nil, CircleFill = nil, TargetLine = nil}
 
-SilentDraw.Circle = Drawing.new("Circle")
-SilentDraw.Circle.Transparency, SilentDraw.Circle.Thickness, SilentDraw.Circle.Color, SilentDraw.Circle.Filled, SilentDraw.Circle.NumSides = 1, 2, Silent.FOVColour, false, Silent.FOVSides
-SilentDraw.CircleFill = Drawing.new("Circle")
-SilentDraw.CircleFill.Transparency, SilentDraw.CircleFill.Thickness, SilentDraw.CircleFill.Color, SilentDraw.CircleFill.Filled, SilentDraw.CircleFill.NumSides = Silent.FOVFillTransparency, 1, Silent.FOVFillColour, true, Silent.FOVSides
-SilentDraw.TargetLine = Drawing.new("Line")
-SilentDraw.TargetLine.Thickness, SilentDraw.TargetLine.Color, SilentDraw.TargetLine.Visible, SilentDraw.TargetLine.Transparency = 1.5, Silent.TargetLineColour, false, 1
+    SilentDraw.Circle = Drawing.new("Circle")
+    SilentDraw.Circle.Transparency, SilentDraw.Circle.Thickness, SilentDraw.Circle.Color, SilentDraw.Circle.Filled, SilentDraw.Circle.NumSides = 1, 2, Silent.FOVColour, false, Silent.FOVSides
+    SilentDraw.CircleFill = Drawing.new("Circle")
+    SilentDraw.CircleFill.Transparency, SilentDraw.CircleFill.Thickness, SilentDraw.CircleFill.Color, SilentDraw.CircleFill.Filled, SilentDraw.CircleFill.NumSides = Silent.FOVFillTransparency, 1, Silent.FOVFillColour, true, Silent.FOVSides
+    SilentDraw.TargetLine = Drawing.new("Line")
+    SilentDraw.TargetLine.Thickness, SilentDraw.TargetLine.Color, SilentDraw.TargetLine.Visible, SilentDraw.TargetLine.Transparency = 1.5, Silent.TargetLineColour, false, 1
 
-local function SilentUpdateFOV()
-    if not SilentDraw.Circle then return end
-    local pos = Vector2.new(G.Mouse.X, G.Mouse.Y + G.GS:GetGuiInset().Y)
-    local radius = Silent.FOV * 3
-    SilentDraw.Circle.Visible, SilentDraw.Circle.Radius, SilentDraw.Circle.Position, SilentDraw.Circle.NumSides, SilentDraw.Circle.Color = Silent.ShowFOV, radius, pos, Silent.FOVSides, Silent.FOVColour
-    if SilentDraw.CircleFill then
-        SilentDraw.CircleFill.Visible, SilentDraw.CircleFill.Radius, SilentDraw.CircleFill.Position, SilentDraw.CircleFill.NumSides, SilentDraw.CircleFill.Color, SilentDraw.CircleFill.Transparency = Silent.ShowFOV and Silent.FOVFilled, radius, pos, Silent.FOVSides, Silent.FOVFillColour, Silent.FOVFillTransparency
-    end
-    return SilentDraw.Circle
-end
-
-local function SilentUpdateTargetLine()
-    if not SilentDraw.TargetLine then return end
-    if Silent.ShowTargetLine and Silent.Selected and Silent.Selected ~= G.LP and Silent.SelectedPart then
-        local partPos, onScreen = G.C:WorldToViewportPoint(Silent.SelectedPart.Position)
-        if onScreen then
-            SilentDraw.TargetLine.Visible = true
-            SilentDraw.TargetLine.From = Silent.TargetLineOrigin == 'Mouse' and Vector2.new(G.Mouse.X, G.Mouse.Y + G.GS:GetGuiInset().Y) or Vector2.new(G.C.ViewportSize.X / 2, G.C.ViewportSize.Y / 2)
-            SilentDraw.TargetLine.To, SilentDraw.TargetLine.Color = Vector2.new(partPos.X, partPos.Y), Silent.TargetLineColour
-            return
+    local function SilentUpdateFOV()
+        if not SilentDraw.Circle then return end
+        local pos = Vector2.new(G.Mouse.X, G.Mouse.Y + G.GS:GetGuiInset().Y)
+        local radius = Silent.FOV * 3
+        SilentDraw.Circle.Visible, SilentDraw.Circle.Radius, SilentDraw.Circle.Position, SilentDraw.Circle.NumSides, SilentDraw.Circle.Color = Silent.ShowFOV, radius, pos, Silent.FOVSides, Silent.FOVColour
+        if SilentDraw.CircleFill then
+            SilentDraw.CircleFill.Visible, SilentDraw.CircleFill.Radius, SilentDraw.CircleFill.Position, SilentDraw.CircleFill.NumSides, SilentDraw.CircleFill.Color, SilentDraw.CircleFill.Transparency = Silent.ShowFOV and Silent.FOVFilled, radius, pos, Silent.FOVSides, Silent.FOVFillColour, Silent.FOVFillTransparency
         end
+        return SilentDraw.Circle
     end
-    SilentDraw.TargetLine.Visible = false
-end
 
-local function SilentCalcChance(pct) return math.random() <= pct / 100 end
-
--- IMPROVED VISIBILITY CHECK
-local function SilentIsPartVisible(Part, PartDescendant)
-    local char = G.LP.Character
-    local params = RaycastParams.new()
-    params.FilterType, params.FilterDescendantsInstances = Enum.RaycastFilterType.Blacklist, {char, G.C, PartDescendant}
-    params.IgnoreWater = true
-    local result = G.W:Raycast(G.C.CFrame.Position, Part.Position - G.C.CFrame.Position, params)
-    return result == nil
-end
-
--- IMPROVED PREDICTION
-local function SilentGetPing()
-    local Ok, Ping = pcall(function()
-        return game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
-    end)
-    if not Ok or typeof(Ping) ~= "number" then
-        return 60
-    end
-    return Ping
-end
-
-local function SilentPredicted(Part)
-    if not Part then return nil end
-    local Ping = SilentGetPing()
-    local PredTime = Silent.Prediction + (math.clamp(Ping, 1, 200) - 60) * 0.00015
-    return Part.Position + Part.AssemblyLinearVelocity * math.clamp(PredTime, 0, 0.3)
-end
-
-local function SilentIsFriend(p)
-    if not p then return false end
-    local ok, isF = pcall(function() return G.LP:IsFriendsWith(p.UserId) end)
-    return ok and isF
-end
-
-local function SilentIsIgnored(p)
-    if Silent.IgnoreFriends and SilentIsFriend(p) then return true end
-    for _, ignored in ipairs(Silent.Ignored.Players) do if ignored == p then return true end end
-    for _, team in ipairs(Silent.Ignored.Teams) do if p.Team == team[1] then return true end end
-    return false
-end
-
--- IMPROVED TARGET PART GETTING
-local function SilentGetTargetPart(char)
-    if not char then return nil end
-    local parts = {}
-    if typeof(Silent.TargetPart) == "string" then
-        if Silent.TargetPart == "All" then
-            for _, v in ipairs(char:GetChildren()) do
-                if v:IsA("BasePart") then table.insert(parts, v) end
+    local function SilentUpdateTargetLine()
+        if not SilentDraw.TargetLine then return end
+        if Silent.ShowTargetLine and Silent.Selected and Silent.Selected ~= G.LP and Silent.SelectedPart then
+            local partPos, onScreen = G.C:WorldToViewportPoint(Silent.SelectedPart.Position)
+            if onScreen then
+                SilentDraw.TargetLine.Visible = true
+                SilentDraw.TargetLine.From = Silent.TargetLineOrigin == 'Mouse' and Vector2.new(G.Mouse.X, G.Mouse.Y + G.GS:GetGuiInset().Y) or Vector2.new(G.C.ViewportSize.X / 2, G.C.ViewportSize.Y / 2)
+                SilentDraw.TargetLine.To, SilentDraw.TargetLine.Color = Vector2.new(partPos.X, partPos.Y), Silent.TargetLineColour
+                return
             end
-        else
-            local p = char:FindFirstChild(Silent.TargetPart)
-            if p then table.insert(parts, p) end
         end
-    elseif typeof(Silent.TargetPart) == "table" then
-        for _, name in ipairs(Silent.TargetPart) do
-            local p = char:FindFirstChild(name)
-            if p then table.insert(parts, p) end
-        end
+        SilentDraw.TargetLine.Visible = false
     end
-    -- Fallback to Head or HumanoidRootPart
-    if #parts == 0 then
-        local h = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
-        if h then table.insert(parts, h) end
-    end
-    return parts
-end
 
--- IMPROVED CLOSEST PLAYER WITH RANKING
-local function SilentGetClosestPlayer()
-    if Silent.Sticky.Enabled and Silent.Sticky.Target then
-        local p = Silent.Sticky.Target
-        if not p or p.Parent ~= G.P then Silent.Sticky.Target = nil
-        else
+    local function SilentCalcChance(pct) return math.random() <= pct / 100 end
+
+    -- IMPROVED VISIBILITY CHECK
+    local function SilentIsPartVisible(Part, PartDescendant)
+        local char = G.LP.Character
+        local params = RaycastParams.new()
+        params.FilterType, params.FilterDescendantsInstances = Enum.RaycastFilterType.Blacklist, {char, G.C, PartDescendant}
+        params.IgnoreWater = true
+        local result = G.W:Raycast(G.C.CFrame.Position, Part.Position - G.C.CFrame.Position, params)
+        return result == nil
+    end
+
+    -- IMPROVED PREDICTION
+    local function SilentGetPing()
+        local Ok, Ping = pcall(function()
+            return game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
+        end)
+        if not Ok or typeof(Ping) ~= "number" then
+            return 60
+        end
+        return Ping
+    end
+
+    local function SilentPredicted(Part)
+        if not Part then return nil end
+        local Ping = SilentGetPing()
+        local PredTime = Silent.Prediction + (math.clamp(Ping, 1, 200) - 60) * 0.00015
+        return Part.Position + Part.AssemblyLinearVelocity * math.clamp(PredTime, 0, 0.3)
+    end
+
+    local function SilentIsFriend(p)
+        if not p then return false end
+        local ok, isF = pcall(function() return G.LP:IsFriendsWith(p.UserId) end)
+        return ok and isF
+    end
+
+    local function SilentIsIgnored(p)
+        if Silent.IgnoreFriends and SilentIsFriend(p) then return true end
+        for _, ignored in ipairs(Silent.Ignored.Players) do if ignored == p then return true end end
+        for _, team in ipairs(Silent.Ignored.Teams) do if p.Team == team[1] then return true end end
+        return false
+    end
+
+    -- IMPROVED TARGET PART GETTING
+    local function SilentGetTargetPart(char)
+        if not char then return nil end
+        local parts = {}
+        if typeof(Silent.TargetPart) == "string" then
+            if Silent.TargetPart == "All" then
+                for _, v in ipairs(char:GetChildren()) do
+                    if v:IsA("BasePart") then table.insert(parts, v) end
+                end
+            else
+                local p = char:FindFirstChild(Silent.TargetPart)
+                if p then table.insert(parts, p) end
+            end
+        elseif typeof(Silent.TargetPart) == "table" then
+            for _, name in ipairs(Silent.TargetPart) do
+                local p = char:FindFirstChild(name)
+                if p then table.insert(parts, p) end
+            end
+        end
+        -- Fallback to Head or HumanoidRootPart
+        if #parts == 0 then
+            local h = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+            if h then table.insert(parts, h) end
+        end
+        return parts
+    end
+
+    -- IMPROVED CLOSEST PLAYER WITH RANKING
+    local function SilentGetClosestPlayer()
+        if Silent.Sticky.Enabled and Silent.Sticky.Target then
+            local p = Silent.Sticky.Target
+            if not p or p.Parent ~= G.P then Silent.Sticky.Target = nil
+            else
+                local char = p.Character
+                if char and isValidTarget(p, Silent.Checks) then
+                    local parts = SilentGetTargetPart(char)
+                    for _, part in ipairs(parts) do
+                        if Silent.Checks.Wall and not SilentIsPartVisible(part, char) then continue end
+                        Silent.Selected, Silent.SelectedPart = p, part
+                        return
+                    end
+                end
+                Silent.Selected, Silent.SelectedPart = nil, nil
+                return
+            end
+        end
+        if not SilentCalcChance(Silent.HitChance) then Silent.Selected, Silent.SelectedPart = nil, nil return end
+        
+        local mousePos = G.U:GetMouseLocation()
+        local origin = G.C.CFrame.Position
+        local myRoot = G.LP.Character and G.LP.Character:FindFirstChild("HumanoidRootPart")
+        if myRoot then origin = myRoot.Position end
+        
+        local closestPlayer, targetPart, bestScore = nil, nil, math.huge
+        
+        for _, p in ipairs(G.P:GetPlayers()) do
             local char = p.Character
-            if char and isValidTarget(p, Silent.Checks) then
+            if not SilentIsIgnored(p) and char and isValidTarget(p, Silent.Checks) then
+                -- Distance check
+                if not Silent.HvH and Silent.MaxDistance > 0 then
+                    local targetRoot = char:FindFirstChild("HumanoidRootPart")
+                    if myRoot and targetRoot and (myRoot.Position - targetRoot.Position).Magnitude > Silent.MaxDistance then
+                        continue
+                    end
+                end
+                
                 local parts = SilentGetTargetPart(char)
                 for _, part in ipairs(parts) do
+                    -- Visibility
                     if Silent.Checks.Wall and not SilentIsPartVisible(part, char) then continue end
-                    Silent.Selected, Silent.SelectedPart = p, part
-                    return
-                end
-            end
-            Silent.Selected, Silent.SelectedPart = nil, nil
-            return
-        end
-    end
-    if not SilentCalcChance(Silent.HitChance) then Silent.Selected, Silent.SelectedPart = nil, nil return end
-    
-    local mousePos = G.U:GetMouseLocation()
-    local origin = G.C.CFrame.Position
-    local myRoot = G.LP.Character and G.LP.Character:FindFirstChild("HumanoidRootPart")
-    if myRoot then origin = myRoot.Position end
-    
-    local closestPlayer, targetPart, bestScore = nil, nil, math.huge
-    
-    for _, p in ipairs(G.P:GetPlayers()) do
-        local char = p.Character
-        if not SilentIsIgnored(p) and char and isValidTarget(p, Silent.Checks) then
-            -- Distance check
-            if not Silent.HvH and Silent.MaxDistance > 0 then
-                local targetRoot = char:FindFirstChild("HumanoidRootPart")
-                if myRoot and targetRoot and (myRoot.Position - targetRoot.Position).Magnitude > Silent.MaxDistance then
-                    continue
-                end
-            end
-            
-            local parts = SilentGetTargetPart(char)
-            for _, part in ipairs(parts) do
-                -- Visibility
-                if Silent.Checks.Wall and not SilentIsPartVisible(part, char) then continue end
-                
-                -- Prediction
-                local predPos = SilentPredicted(part)
-                if not predPos then predPos = part.Position end
-                
-                -- Screen position
-                local screenPos, onScreen = G.C:WorldToViewportPoint(predPos)
-                if not onScreen or screenPos.Z <= 0 then continue end
-                
-                -- FOV and distance ranking
-                local dist2D = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                if Silent.UseFOV and SilentDraw.Circle.Radius < dist2D then continue end
-                
-                -- Score: 2D distance + weighted 3D distance
-                local score = dist2D + ((origin - predPos).Magnitude * 0.45)
-                if score < bestScore then
-                    bestScore, closestPlayer, targetPart = score, p, part
-                end
-            end
-        end
-    end
-    
-    Silent.Selected, Silent.SelectedPart = closestPlayer, targetPart
-end
-
--- HOOK THE MOUSE
-local mt = getrawmetatable(game)
-local oldIndex = mt.__index
-setreadonly(mt, false)
-mt.__index = function(t, k)
-    if t == G.Mouse and (k == "Hit" or k == "Target") and Silent.Enabled and Silent.SelectedPart then
-        if Silent.Selected and not isValidTarget(Silent.Selected, Silent.Checks) then
-            Silent.Selected, Silent.SelectedPart = nil, nil
-            return oldIndex(t, k)
-        end
-        if k == "Hit" then
-            local predPos = SilentPredicted(Silent.SelectedPart)
-            local pos = predPos or Silent.SelectedPart.Position
-            if getgenv().BypassAimView then
-                local jitter = Vector3.new(math.random(-8,8)/1000, math.random(-8,8)/1000, math.random(-8,8)/1000)
-                return CFrame.new(pos + jitter)
-            end
-            return CFrame.new(pos)
-        elseif k == "Target" then return Silent.SelectedPart end
-    end
-    return oldIndex(t, k)
-end
-setreadonly(mt, true)
-
--- HOOK GUNHANDLER FOR BETTER AIM
-pcall(function()
-    local Modules = G.RS:FindFirstChild("Modules")
-    local GunMod = Modules and Modules:FindFirstChild("GunHandler")
-    if not GunMod then return end
-    local Ok, Gun = pcall(require, GunMod)
-    if not Ok or type(Gun) ~= "table" then return end
-    
-    -- Hook GetAim
-    local GetAimKey = (type(Gun.GetAim) == "function" and "GetAim") or (type(Gun.getAim) == "function" and "getAim")
-    if GetAimKey then
-        local OldGetAim = Gun[GetAimKey]
-        Gun[GetAimKey] = function(Origin, ...)
-            if Silent.Enabled and Silent.SelectedPart then
-                local predPos = SilentPredicted(Silent.SelectedPart)
-                if predPos then
-                    local delta = predPos - Origin
-                    if delta.Magnitude > 0.001 then
-                        return delta.Unit, delta.Magnitude
+                    
+                    -- Prediction
+                    local predPos = SilentPredicted(part)
+                    if not predPos then predPos = part.Position end
+                    
+                    -- Screen position
+                    local screenPos, onScreen = G.C:WorldToViewportPoint(predPos)
+                    if not onScreen or screenPos.Z <= 0 then continue end
+                    
+                    -- FOV and distance ranking
+                    local dist2D = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if Silent.UseFOV and SilentDraw.Circle.Radius < dist2D then continue end
+                    
+                    -- Score: 2D distance + weighted 3D distance
+                    local score = dist2D + ((origin - predPos).Magnitude * 0.45)
+                    if score < bestScore then
+                        bestScore, closestPlayer, targetPart = score, p, part
                     end
                 end
             end
-            if OldGetAim then return OldGetAim(Origin, ...) end
         end
+        
+        Silent.Selected, Silent.SelectedPart = closestPlayer, targetPart
     end
-    
-    -- Hook Shoot
-    local ShootKey = (type(Gun.Shoot) == "function" and "Shoot") or (type(Gun.shoot) == "function" and "shoot")
-    if ShootKey then
-        local OldShoot = Gun[ShootKey]
-        Gun[ShootKey] = function(Data)
-            if Silent.Enabled and Silent.SelectedPart and type(Data) == "table" then
+
+    -- HOOK THE MOUSE
+    local mt = getrawmetatable(game)
+    local oldIndex = mt.__index
+    setreadonly(mt, false)
+    mt.__index = function(t, k)
+        if t == G.Mouse and (k == "Hit" or k == "Target") and Silent.Enabled and Silent.SelectedPart then
+            if Silent.Selected and not isValidTarget(Silent.Selected, Silent.Checks) then
+                Silent.Selected, Silent.SelectedPart = nil, nil
+                return oldIndex(t, k)
+            end
+            if k == "Hit" then
                 local predPos = SilentPredicted(Silent.SelectedPart)
                 local pos = predPos or Silent.SelectedPart.Position
-                if pos then
-                    Data.AimPosition = pos
-                    Data.aimPosition = pos
-                    Data.Hit = nil
-                    Data.Instance = nil
+                if getgenv().BypassAimView then
+                    local jitter = Vector3.new(math.random(-8,8)/1000, math.random(-8,8)/1000, math.random(-8,8)/1000)
+                    return CFrame.new(pos + jitter)
                 end
-            end
-            if OldShoot then return OldShoot(Data) end
+                return CFrame.new(pos)
+            elseif k == "Target" then return Silent.SelectedPart end
         end
+        return oldIndex(t, k)
     end
-end)
+    setreadonly(mt, true)
 
--- HEARTBEAT LOOP
-G.R.Heartbeat:Connect(function() 
-    pcall(function() 
-        SilentUpdateFOV() 
-        SilentUpdateTargetLine() 
-        SilentGetClosestPlayer() 
-    end) 
-end)
+    -- HOOK GUNHANDLER FOR BETTER AIM
+    pcall(function()
+        local Modules = G.RS:FindFirstChild("Modules")
+        local GunMod = Modules and Modules:FindFirstChild("GunHandler")
+        if not GunMod then return end
+        local Ok, Gun = pcall(require, GunMod)
+        if not Ok or type(Gun) ~= "table" then return end
+        
+        -- Hook GetAim
+        local GetAimKey = (type(Gun.GetAim) == "function" and "GetAim") or (type(Gun.getAim) == "function" and "getAim")
+        if GetAimKey then
+            local OldGetAim = Gun[GetAimKey]
+            Gun[GetAimKey] = function(Origin, ...)
+                if Silent.Enabled and Silent.SelectedPart then
+                    local predPos = SilentPredicted(Silent.SelectedPart)
+                    if predPos then
+                        local delta = predPos - Origin
+                        if delta.Magnitude > 0.001 then
+                            return delta.Unit, delta.Magnitude
+                        end
+                    end
+                end
+                if OldGetAim then return OldGetAim(Origin, ...) end
+            end
+        end
+        
+        -- Hook Shoot
+        local ShootKey = (type(Gun.Shoot) == "function" and "Shoot") or (type(Gun.shoot) == "function" and "shoot")
+        if ShootKey then
+            local OldShoot = Gun[ShootKey]
+            Gun[ShootKey] = function(Data)
+                if Silent.Enabled and Silent.SelectedPart and type(Data) == "table" then
+                    local predPos = SilentPredicted(Silent.SelectedPart)
+                    local pos = predPos or Silent.SelectedPart.Position
+                    if pos then
+                        Data.AimPosition = pos
+                        Data.aimPosition = pos
+                        Data.Hit = nil
+                        Data.Instance = nil
+                    end
+                end
+                if OldShoot then return OldShoot(Data) end
+            end
+        end
+    end)
 
--- SILENT MENU
-Sections.LegitRight:Toggle({Name = 'silent', Flag = 'silent_aim_toggle', Default = false, Callback = function(v) Silent.Enabled = v end})
+    -- HEARTBEAT LOOP
+    G.R.Heartbeat:Connect(function() 
+        pcall(function() 
+            SilentUpdateFOV() 
+            SilentUpdateTargetLine() 
+            SilentGetClosestPlayer() 
+        end) 
+    end)
 
-Sections.LegitRight:Toggle({Name = 'ignore friends', Flag = 'silent_ignore_friends', Default = false, Callback = function(v) Silent.IgnoreFriends = v end})
-Sections.LegitRight:Dropdown({Name = 'checks', Flag = 'silent_checks', Items = {'Wall Check','Knock Check','Team Check'}, Default = {'Wall Check','Knock Check'}, Multi = true, Callback = function(v)
-    Silent.Checks.Wall, Silent.Checks.Knock = table.find(v,'Wall Check')~=nil, table.find(v,'Knock Check')~=nil
-    local team = table.find(v,'Team Check')~=nil
-    Silent.Checks.Team = team
-    if team then 
-        for _, team in ipairs(Silent.Ignored.Teams) do 
-            if team[1] == G.LP.Team then return end 
-        end 
-        table.insert(Silent.Ignored.Teams, {G.LP.Team, G.LP.TeamColor})
-    else 
-        for i, team in ipairs(Silent.Ignored.Teams) do 
-            if team[1] == G.LP.Team then 
-                table.remove(Silent.Ignored.Teams, i) 
-                break 
+    -- SILENT MENU
+    Sections.LegitRight:Toggle({Name = 'silent', Flag = 'silent_aim_toggle', Default = false, Callback = function(v) Silent.Enabled = v end})
+
+    Sections.LegitRight:Toggle({Name = 'ignore friends', Flag = 'silent_ignore_friends', Default = false, Callback = function(v) Silent.IgnoreFriends = v end})
+    Sections.LegitRight:Dropdown({Name = 'checks', Flag = 'silent_checks', Items = {'Wall Check','Knock Check','Team Check'}, Default = {'Wall Check','Knock Check'}, Multi = true, Callback = function(v)
+        Silent.Checks.Wall, Silent.Checks.Knock = table.find(v,'Wall Check')~=nil, table.find(v,'Knock Check')~=nil
+        local team = table.find(v,'Team Check')~=nil
+        Silent.Checks.Team = team
+        if team then 
+            for _, team in ipairs(Silent.Ignored.Teams) do 
+                if team[1] == G.LP.Team then return end 
             end 
-        end 
-    end
-end})
-Sections.LegitRight:Slider({Name = 'max distance', Flag = 'silent_max_distance', Default = 250, Min = 0, Max = 1000, Decimals = 1, Suffix = ' studs', Callback = function(v) Silent.MaxDistance = v end})
-Sections.LegitRight:Toggle({Name = 'hvh', Flag = 'silent_hvh_toggle', Default = false, Callback = function(v) Silent.HvH = v end})
-Sections.LegitRight:Toggle({Name = 'fov', Flag = 'silent_fov_toggle', Default = false, Callback = function(v) Silent.UseFOV = v end})
-local ShowFOVToggle = Sections.LegitRight:Toggle({Name = 'show fov', Flag = 'show_silent_fov', Default = false, Callback = function(v) Silent.ShowFOV = v end})
-ShowFOVToggle:Colorpicker({Flag = 'silent_fov_color', Default = Color3.fromRGB(231,84,128), Alpha = 0, Callback = function(c,a) Silent.FOVColour = c end})
-Sections.LegitRight:Slider({Name = 'fov', Flag = 'silent_fov', Default = 0.13, Min = 0, Max = 1, Decimals = 0.01, Callback = function(v) Silent.FOV = v * 500 end})
-local FillFOVToggle = Sections.LegitRight:Toggle({Name = 'fill fov', Flag = 'silent_fov_fill_toggle', Default = false, Callback = function(v) Silent.FOVFilled = v end})
-FillFOVToggle:Colorpicker({Flag = 'silent_fov_fill_color', Default = Color3.fromRGB(231,84,128), Alpha = 0, Callback = function(c,a) Silent.FOVFillColour = c end})
-Sections.LegitRight:Slider({Name = 'fill transparency', Flag = 'silent_fov_fill_transparency', Default = 0.5, Min = 0, Max = 1, Decimals = 0.01, Callback = function(v) Silent.FOVFillTransparency = v end})
-local TargetLineToggle = Sections.LegitRight:Toggle({Name = 'target line', Flag = 'silent_target_line', Default = false, Callback = function(v) Silent.ShowTargetLine = v end})
-TargetLineToggle:Colorpicker({Flag = 'silent_target_line_color', Default = Color3.fromRGB(255,255,255), Alpha = 0, Callback = function(c,a) Silent.TargetLineColour = c end})
-Sections.LegitRight:Dropdown({Name = 'target line origin', Flag = 'silent_target_line_origin', Items = {'Screen Center','Mouse'}, Default = 'Screen Center', Multi = false, Callback = function(v) Silent.TargetLineOrigin = v end})
-local StickyToggle = Sections.LegitRight:Toggle({Name = 'sticky', Flag = 'silent_sticky_toggle', Default = false, Callback = function(v)
-    Silent.Sticky.Enabled = v
-    if v and Silent.Selected and Silent.Selected ~= G.LP then 
-        Silent.Sticky.Target = Silent.Selected 
-    else 
-        Silent.Sticky.Target, Silent.Selected, Silent.SelectedPart = nil, nil, nil 
-    end
-end})
-StickyToggle:Keybind({Flag = 'silent_sticky_key', Default = Enum.KeyCode.T, Mode = 'Toggle', Callback = function(s)
-    Silent.Sticky.Enabled = s
-    if s and Silent.Selected and Silent.Selected ~= G.LP then 
-        Silent.Sticky.Target = Silent.Selected 
-    else 
-        Silent.Sticky.Target, Silent.Selected, Silent.SelectedPart = nil, nil, nil 
-    end
-end})
-Sections.LegitRight:Slider({Name = 'Prediction Time', Flag = 'silent_prediction_time', Default = 0.13, Min = 0, Max = 1, Decimals = 0.01, Callback = function(v) Silent.Prediction = v getgenv().Prediction = v end})
-Sections.LegitRight:Dropdown({Name = 'target part', Flag = 'silent_target_part', Items = {'Head','HumanoidRootPart','UpperTorso','LowerTorso','Torso','All'}, Default = {'Head'}, Multi = true, Callback = function(v) Silent.TargetPart = v or {"Head"} end})
+            table.insert(Silent.Ignored.Teams, {G.LP.Team, G.LP.TeamColor})
+        else 
+            for i, team in ipairs(Silent.Ignored.Teams) do 
+                if team[1] == G.LP.Team then 
+                    table.remove(Silent.Ignored.Teams, i) 
+                    break 
+                end 
+            end 
+        end
+    end})
+    Sections.LegitRight:Slider({Name = 'max distance', Flag = 'silent_max_distance', Default = 250, Min = 0, Max = 1000, Decimals = 1, Suffix = ' studs', Callback = function(v) Silent.MaxDistance = v end})
+    Sections.LegitRight:Toggle({Name = 'hvh', Flag = 'silent_hvh_toggle', Default = false, Callback = function(v) Silent.HvH = v end})
+    Sections.LegitRight:Toggle({Name = 'fov', Flag = 'silent_fov_toggle', Default = false, Callback = function(v) Silent.UseFOV = v end})
+    local ShowFOVToggle = Sections.LegitRight:Toggle({Name = 'show fov', Flag = 'show_silent_fov', Default = false, Callback = function(v) Silent.ShowFOV = v end})
+    ShowFOVToggle:Colorpicker({Flag = 'silent_fov_color', Default = Color3.fromRGB(231,84,128), Alpha = 0, Callback = function(c,a) Silent.FOVColour = c end})
+    Sections.LegitRight:Slider({Name = 'fov', Flag = 'silent_fov', Default = 0.13, Min = 0, Max = 1, Decimals = 0.01, Callback = function(v) Silent.FOV = v * 500 end})
+    local FillFOVToggle = Sections.LegitRight:Toggle({Name = 'fill fov', Flag = 'silent_fov_fill_toggle', Default = false, Callback = function(v) Silent.FOVFilled = v end})
+    FillFOVToggle:Colorpicker({Flag = 'silent_fov_fill_color', Default = Color3.fromRGB(231,84,128), Alpha = 0, Callback = function(c,a) Silent.FOVFillColour = c end})
+    Sections.LegitRight:Slider({Name = 'fill transparency', Flag = 'silent_fov_fill_transparency', Default = 0.5, Min = 0, Max = 1, Decimals = 0.01, Callback = function(v) Silent.FOVFillTransparency = v end})
+    local TargetLineToggle = Sections.LegitRight:Toggle({Name = 'target line', Flag = 'silent_target_line', Default = false, Callback = function(v) Silent.ShowTargetLine = v end})
+    TargetLineToggle:Colorpicker({Flag = 'silent_target_line_color', Default = Color3.fromRGB(255,255,255), Alpha = 0, Callback = function(c,a) Silent.TargetLineColour = c end})
+    Sections.LegitRight:Dropdown({Name = 'target line origin', Flag = 'silent_target_line_origin', Items = {'Screen Center','Mouse'}, Default = 'Screen Center', Multi = false, Callback = function(v) Silent.TargetLineOrigin = v end})
+    local StickyToggle = Sections.LegitRight:Toggle({Name = 'sticky', Flag = 'silent_sticky_toggle', Default = false, Callback = function(v)
+        Silent.Sticky.Enabled = v
+        if v and Silent.Selected and Silent.Selected ~= G.LP then 
+            Silent.Sticky.Target = Silent.Selected 
+        else 
+            Silent.Sticky.Target, Silent.Selected, Silent.SelectedPart = nil, nil, nil 
+        end
+    end})
+    StickyToggle:Keybind({Flag = 'silent_sticky_key', Default = Enum.KeyCode.T, Mode = 'Toggle', Callback = function(s)
+        Silent.Sticky.Enabled = s
+        if s and Silent.Selected and Silent.Selected ~= G.LP then 
+            Silent.Sticky.Target = Silent.Selected 
+        else 
+            Silent.Sticky.Target, Silent.Selected, Silent.SelectedPart = nil, nil, nil 
+        end
+    end})
+    Sections.LegitRight:Slider({Name = 'Prediction Time', Flag = 'silent_prediction_time', Default = 0.13, Min = 0, Max = 1, Decimals = 0.01, Callback = function(v) Silent.Prediction = v getgenv().Prediction = v end})
+    Sections.LegitRight:Dropdown({Name = 'target part', Flag = 'silent_target_part', Items = {'Head','HumanoidRootPart','UpperTorso','LowerTorso','Torso','All'}, Default = {'Head'}, Multi = true, Callback = function(v) Silent.TargetPart = v or {"Head"} end})
     
     -- ============================================
     -- RAGE LEFT
@@ -538,309 +536,242 @@ Sections.LegitRight:Dropdown({Name = 'target part', Flag = 'silent_target_part',
     local KillRemote = findRemote("MainGameEvent") or findRemote("MainRemoteEvent")
     LoadoutRemote = findRemote("Loadout")
     
--- AMMO REFILL (UNBLOCKED - WORKS WITH RAPID FIRE)
-local function requestAmmoRefill(tool)
-    if LoadoutRemote == nil or tool == nil then return false end
-    -- Remove the isRefilling block - let it refill even if "refilling"
-    local ammo = tool:FindFirstChild("Ammo")
-    if not ammo then return false end
-    if ammo:GetAttribute("ZeeKillRefillRequested") then return false end
-    if ammo.Value > 1 then return false end -- Only refill when 1 or less
-    
-    local char, bp = G.LP.Character, G.LP:FindFirstChild("Backpack")
-    if bp == nil then return false end
-    
-    local gunName = tool.Name
-    -- Don't set isRefilling to block, just use the attribute
-    ammo:SetAttribute("ZeeKillRefillRequested", true)
-    
-    local reqName, oldTools, eqTools, newestTools, seen = tool.Name, {}, {}, {}, {}
-    for _, cont in ipairs({bp, char}) do if cont then for _, item in ipairs(cont:GetChildren()) do if item:IsA("Tool") and item:FindFirstChild("Ammo") then oldTools[item] = true if item.Parent == char then eqTools[item.Name] = true end end end end end
-    local conns, stopped, deadline, lastAdd = {}, false, os.clock() + 2.0, os.clock()
-    local function stop() if stopped then return end stopped = true for _, conn in ipairs(conns) do pcall(function() conn:Disconnect() end) end if not newestTools[reqName] and ammo.Parent then ammo:SetAttribute("ZeeKillRefillRequested", nil) end end
-    local function accept(item) if not item:IsA("Tool") or not item:FindFirstChild("Ammo") or oldTools[item] or seen[item] then return end seen[item], lastAdd = true, os.clock() local name = item.Name local prev = newestTools[name] if prev and prev ~= item and prev.Parent then prev:Destroy() end newestTools[name] = item for old in pairs(oldTools) do if old.Name == name and old.Parent and old ~= tool then old:Destroy() end end if eqTools[name] and char and item.Parent and item ~= tool then item.Parent = char end end
-    conns[1] = bp.ChildAdded:Connect(accept) if char then conns[2] = char.ChildAdded:Connect(accept) end
-    
-    local allGuns = {} if bp then for _, item in ipairs(bp:GetChildren()) do if item:IsA("Tool") and item:FindFirstChild("Ammo") and item ~= tool then table.insert(allGuns, item.Name) end end end
-    if char then local equipped = char:FindFirstChildOfClass("Tool") if equipped and equipped:FindFirstChild("Ammo") and equipped ~= tool then table.insert(allGuns, equipped.Name) end end
-    table.insert(allGuns, tool.Name)
-    LoadoutRemote:FireServer(allGuns)
-    
-    -- DETECTORS
-    local refilled = false
-    local detect1, detect2
-    
-    detect1 = bp.ChildAdded:Connect(function(child)
-        if refilled then return end
-        if child:IsA("Tool") and child.Name == gunName then
-            refilled = true
-            task.spawn(function()
-                task.wait(0.05)
-                local c = G.LP.Character
-                if c and child.Parent == bp then
-                    child.Parent = c
-                end
-                if detect1 then pcall(function() detect1:Disconnect() end) end
-                if detect2 then pcall(function() detect2:Disconnect() end) end
-                -- Clear the refill request
-                task.wait(0.1)
-                if ammo and ammo.Parent then ammo:SetAttribute("ZeeKillRefillRequested", nil) end
-            end)
-        end
-    end)
-    
-    if char then
-        detect2 = char.ChildAdded:Connect(function(child)
+    -- ============================================
+    -- AMMO REFILL (UNBLOCKED - WORKS WITH RAPID FIRE)
+    -- ============================================
+    local function requestAmmoRefill(tool)
+        if LoadoutRemote == nil or tool == nil then return false end
+        local ammo = tool:FindFirstChild("Ammo")
+        if not ammo then return false end
+        if ammo:GetAttribute("ZeeKillRefillRequested") then return false end
+        if ammo.Value > 1 then return false end
+        
+        local char, bp = G.LP.Character, G.LP:FindFirstChild("Backpack")
+        if bp == nil then return false end
+        
+        local gunName = tool.Name
+        ammo:SetAttribute("ZeeKillRefillRequested", true)
+        
+        local reqName, oldTools, eqTools, newestTools, seen = tool.Name, {}, {}, {}, {}
+        for _, cont in ipairs({bp, char}) do if cont then for _, item in ipairs(cont:GetChildren()) do if item:IsA("Tool") and item:FindFirstChild("Ammo") then oldTools[item] = true if item.Parent == char then eqTools[item.Name] = true end end end end end
+        local conns, stopped, deadline, lastAdd = {}, false, os.clock() + 2.0, os.clock()
+        local function stop() if stopped then return end stopped = true for _, conn in ipairs(conns) do pcall(function() conn:Disconnect() end) end if not newestTools[reqName] and ammo.Parent then ammo:SetAttribute("ZeeKillRefillRequested", nil) end end
+        local function accept(item) if not item:IsA("Tool") or not item:FindFirstChild("Ammo") or oldTools[item] or seen[item] then return end seen[item], lastAdd = true, os.clock() local name = item.Name local prev = newestTools[name] if prev and prev ~= item and prev.Parent then prev:Destroy() end newestTools[name] = item for old in pairs(oldTools) do if old.Name == name and old.Parent and old ~= tool then old:Destroy() end end if eqTools[name] and char and item.Parent and item ~= tool then item.Parent = char end end
+        conns[1] = bp.ChildAdded:Connect(accept) if char then conns[2] = char.ChildAdded:Connect(accept) end
+        
+        local allGuns = {} if bp then for _, item in ipairs(bp:GetChildren()) do if item:IsA("Tool") and item:FindFirstChild("Ammo") and item ~= tool then table.insert(allGuns, item.Name) end end end
+        if char then local equipped = char:FindFirstChildOfClass("Tool") if equipped and equipped:FindFirstChild("Ammo") and equipped ~= tool then table.insert(allGuns, equipped.Name) end end
+        table.insert(allGuns, tool.Name)
+        LoadoutRemote:FireServer(allGuns)
+        
+        local refilled = false
+        local detect1, detect2
+        
+        detect1 = bp.ChildAdded:Connect(function(child)
             if refilled then return end
             if child:IsA("Tool") and child.Name == gunName then
                 refilled = true
+                task.spawn(function()
+                    task.wait(0.05)
+                    local c = G.LP.Character
+                    if c and child.Parent == bp then
+                        child.Parent = c
+                    end
+                    if detect1 then pcall(function() detect1:Disconnect() end) end
+                    if detect2 then pcall(function() detect2:Disconnect() end) end
+                    task.wait(0.1)
+                    if ammo and ammo.Parent then ammo:SetAttribute("ZeeKillRefillRequested", nil) end
+                end)
+            end
+        end)
+        
+        if char then
+            detect2 = char.ChildAdded:Connect(function(child)
+                if refilled then return end
+                if child:IsA("Tool") and child.Name == gunName then
+                    refilled = true
+                    if detect1 then pcall(function() detect1:Disconnect() end) end
+                    if detect2 then pcall(function() detect2:Disconnect() end) end
+                    task.wait(0.1)
+                    if ammo and ammo.Parent then ammo:SetAttribute("ZeeKillRefillRequested", nil) end
+                end
+            end)
+        end
+        
+        task.delay(0.8, function()
+            if not refilled then
+                local c = G.LP.Character
+                local b = G.LP:FindFirstChild("Backpack")
+                if c and b then
+                    local gt = b:FindFirstChild(gunName)
+                    if gt and not c:FindFirstChild(gunName) then
+                        gt.Parent = c
+                    end
+                end
                 if detect1 then pcall(function() detect1:Disconnect() end) end
                 if detect2 then pcall(function() detect2:Disconnect() end) end
                 task.wait(0.1)
                 if ammo and ammo.Parent then ammo:SetAttribute("ZeeKillRefillRequested", nil) end
             end
         end)
-    end
-    
-    -- FALLBACK
-    task.delay(0.8, function()
-        if not refilled then
-            local c = G.LP.Character
-            local b = G.LP:FindFirstChild("Backpack")
-            if c and b then
-                local gt = b:FindFirstChild(gunName)
-                if gt and not c:FindFirstChild(gunName) then
-                    gt.Parent = c
-                end
-            end
+        
+        task.delay(2, function()
             if detect1 then pcall(function() detect1:Disconnect() end) end
             if detect2 then pcall(function() detect2:Disconnect() end) end
-            task.wait(0.1)
             if ammo and ammo.Parent then ammo:SetAttribute("ZeeKillRefillRequested", nil) end
-        end
-    end)
-    
-    -- Cleanup
-    task.delay(2, function()
-        if detect1 then pcall(function() detect1:Disconnect() end) end
-        if detect2 then pcall(function() detect2:Disconnect() end) end
-        if ammo and ammo.Parent then ammo:SetAttribute("ZeeKillRefillRequested", nil) end
-    end)
-    
-    G.R.Heartbeat:Connect(function() if os.clock() >= deadline or (next(newestTools) and os.clock() - lastAdd >= 0.15) then stop() end end)
-    return true
-end
-
-local function ForceRefillAllGuns()
-    local char, bp = G.LP.Character, G.LP:FindFirstChild("Backpack")
-    if not char and not bp then return end
-    local tool = char and char:FindFirstChildOfClass("Tool")
-    if tool and tool:FindFirstChild("Ammo") then
-        local ammo = tool:FindFirstChild("Ammo")
-        if ammo.Value <= 3 and not ammo:GetAttribute("ZeeKillRefillRequested") then requestAmmoRefill(tool) end
+        end)
+        
+        G.R.Heartbeat:Connect(function() if os.clock() >= deadline or (next(newestTools) and os.clock() - lastAdd >= 0.15) then stop() end end)
+        return true
     end
-    if bp then for _, item in ipairs(bp:GetChildren()) do
-        if item:IsA("Tool") and item:FindFirstChild("Ammo") then
-            local ammo = item:FindFirstChild("Ammo")
-            if ammo.Value <= 3 and not ammo:GetAttribute("ZeeKillRefillRequested") then requestAmmoRefill(item) end
-        end
-    end end
-end
-    
-    
-    
--- ============================================
--- WEAPONS TAB - CLEAN WORKING VERSION (WITH GUN FILTER)
--- ============================================
 
--- ========================== SPREAD SYSTEM ==========================
-local spreadSettings = { enabled = false, amount = 0 }
-
-local origRand
-origRand = hookfunction(math.random, function(...)
-    local args = { ... }
-    if checkcaller() then return origRand(...) end
-    if (#args == 0) or (args[1] == -0.05 and args[2] == 0.05) or (args[1] == -0.1) or (args[1] == -0.05) then
-        if spreadSettings.enabled then
-            return origRand(...) * (spreadSettings.amount / 100)
+    local function ForceRefillAllGuns()
+        local char, bp = G.LP.Character, G.LP:FindFirstChild("Backpack")
+        if not char and not bp then return end
+        local tool = char and char:FindFirstChildOfClass("Tool")
+        if tool and tool:FindFirstChild("Ammo") then
+            local ammo = tool:FindFirstChild("Ammo")
+            if ammo.Value <= 3 and not ammo:GetAttribute("ZeeKillRefillRequested") then requestAmmoRefill(tool) end
         end
+        if bp then for _, item in ipairs(bp:GetChildren()) do
+            if item:IsA("Tool") and item:FindFirstChild("Ammo") then
+                local ammo = item:FindFirstChild("Ammo")
+                if ammo.Value <= 3 and not ammo:GetAttribute("ZeeKillRefillRequested") then requestAmmoRefill(item) end
+            end
+        end end
     end
-    return origRand(...)
-end)
+    
+    -- ============================================
+    -- SPREAD SYSTEM
+    -- ============================================
+    local spreadSettings = { enabled = false, amount = 0 }
 
-Sections.WeaponsRight:Dropdown({
-    Name = "Spread Guns",
-    Flag = "spread_gun_selector",
-    Items = {"Tactical Shotgun"},
-    Default = {},
-    Multi = true,
-})
-
-Sections.WeaponsRight:Toggle({
-    Name = "adjust spread",
-    Flag = "adjust_spread",
-    Default = false,
-    Callback = function(v) spreadSettings.enabled = v end,
-})
-
-Sections.WeaponsRight:Slider({
-    Name = "spread amount",
-    Flag = "spread_amount",
-    Min = 1, Max = 100, Default = 1,
-    Callback = function(v) spreadSettings.amount = v end,
-})
-
--- ============================================
--- GUN NAME MAPPING
--- ============================================
-
-local GUN_TOOL_NAMES = {
-    ["Revolver"] = "[Revolver]",
-    ["Tactical SG"] = "[TacticalShotgun]",
-    ["Double Barrel"] = "[Double-Barrel SG]",
-}
-
-local selectedGuns = {"Revolver", "Tactical SG", "Double Barrel"}
-local currentSelected = {"Revolver"}
-
-local function isGunSelected(tool)
-    if not tool or not currentSelected or #currentSelected == 0 then return false end
-    for _, name in ipairs(currentSelected) do
-        if GUN_TOOL_NAMES[name] and tool.Name == GUN_TOOL_NAMES[name] then
-            return true
-        end
-    end
-    return false
-end
-
--- ============================================
--- RANGE EXPANDER (STANDALONE)
--- ============================================
-
-local rangeOn = false
-local rangeValue = 999999
-
-local _grm = getrawmetatable(game)
-local _oldIndex = _grm.__index
-setreadonly(_grm, false)
-
-_grm.__index = function(self, key)
-    if not checkcaller() and self == G.LP:GetMouse() then
-        if rangeOn and key == "Hit" then
-            local unitRay = _oldIndex(self, "UnitRay")
-            if unitRay then
-                local origin = unitRay.Origin
-                local params = RaycastParams.new()
-                params.FilterType = Enum.RaycastFilterType.Exclude
-                params.FilterDescendantsInstances = { G.LP.Character }
-                local res = G.W:Raycast(origin, unitRay.Direction * rangeValue, params)
-                local hitPos = res and res.Position or (origin + unitRay.Direction * rangeValue)
-                return CFrame.new(hitPos)
+    local origRand
+    origRand = hookfunction(math.random, function(...)
+        local args = { ... }
+        if checkcaller() then return origRand(...) end
+        if (#args == 0) or (args[1] == -0.05 and args[2] == 0.05) or (args[1] == -0.1) or (args[1] == -0.05) then
+            if spreadSettings.enabled then
+                return origRand(...) * (spreadSettings.amount / 100)
             end
         end
-    end
-    return _oldIndex(self, key)
-end
-setreadonly(_grm, true)
+        return origRand(...)
+    end)
 
-local gunHandlerPatched = false
-local function patchGunHandler()
-    if gunHandlerPatched then return end
-    task.spawn(function()
-        local modules = G.RS:FindFirstChild("Modules")
-        if not modules then modules = G.RS:WaitForChild("Modules", 10) end
-        if not modules then return end
-        local gunhandler = modules:FindFirstChild("GunHandler")
-        if not gunhandler then gunhandler = modules:WaitForChild("GunHandler", 10) end
-        if not gunhandler then return end
-        local ok, handler = pcall(require, gunhandler)
-        if not ok or type(handler) ~= "table" then return end
+    Sections.WeaponsRight:Dropdown({
+        Name = "Spread Guns",
+        Flag = "spread_gun_selector",
+        Items = {"Tactical Shotgun"},
+        Default = {},
+        Multi = true,
+    })
 
-        local function patchShoot(original)
-            if type(original) ~= "function" then return original end
-            return function(t, ...)
-                if type(t) == "table" and rangeOn then
-                    t.Range = rangeValue
-                    if t.range then t.range = rangeValue end
-                end
-                return original(t, ...)
+    Sections.WeaponsRight:Toggle({
+        Name = "adjust spread",
+        Flag = "adjust_spread",
+        Default = false,
+        Callback = function(v) spreadSettings.enabled = v end,
+    })
+
+    Sections.WeaponsRight:Slider({
+        Name = "spread amount",
+        Flag = "spread_amount",
+        Min = 1, Max = 100, Default = 1,
+        Callback = function(v) spreadSettings.amount = v end,
+    })
+
+    -- ============================================
+    -- GUN NAME MAPPING
+    -- ============================================
+    local GUN_TOOL_NAMES = {
+        ["Revolver"] = "[Revolver]",
+        ["Tactical SG"] = "[TacticalShotgun]",
+        ["Double Barrel"] = "[Double-Barrel SG]",
+    }
+
+    local selectedGuns = {"Revolver", "Tactical SG", "Double Barrel"}
+    local currentSelected = {"Revolver"}
+
+    local function isGunSelected(tool)
+        if not tool or not currentSelected or #currentSelected == 0 then return false end
+        for _, name in ipairs(currentSelected) do
+            if GUN_TOOL_NAMES[name] and tool.Name == GUN_TOOL_NAMES[name] then
+                return true
             end
         end
+        return false
+    end
 
-        if handler.Shoot then handler.Shoot = patchShoot(handler.Shoot) end
-        if handler.shoot then handler.shoot = patchShoot(handler.shoot) end
-        gunHandlerPatched = true
-    end)
-end
+    -- ============================================
+    -- RANGE EXPANDER (STANDALONE)
+    -- ============================================
+    local rangeOn = false
+    local rangeValue = 999999
 
--- ============================================
--- RAPID FIRE (SINGLE SYSTEM - FILTERED)
--- ============================================
+    local _grm = getrawmetatable(game)
+    local _oldIndex = _grm.__index
+    setreadonly(_grm, false)
 
-local rapidOn = false
-local rapidGuns = {} -- tool -> true
-
-local function setupRapid(gun)
-    if rapidGuns[gun] then return end
-    if gun.Parent ~= G.LP.Character then return end
-    if not isGunSelected(gun) then return end  -- <-- FILTER
-    
-    local conns = getconnections(gun.Activated)
-    for _, c in ipairs(conns) do
-        local fn = c.Function
-        if fn then
-            local info = debug.getinfo(fn)
-            for i = 1, (info.nups or 0) do
-                local val = debug.getupvalue(fn, i)
-                if type(val) == "number" and val > 0 and val < 0.5 then
-                    debug.setupvalue(fn, i, 0)
+    _grm.__index = function(self, key)
+        if not checkcaller() and self == G.LP:GetMouse() then
+            if rangeOn and key == "Hit" then
+                local unitRay = _oldIndex(self, "UnitRay")
+                if unitRay then
+                    local origin = unitRay.Origin
+                    local params = RaycastParams.new()
+                    params.FilterType = Enum.RaycastFilterType.Exclude
+                    params.FilterDescendantsInstances = { G.LP.Character }
+                    local res = G.W:Raycast(origin, unitRay.Direction * rangeValue, params)
+                    local hitPos = res and res.Position or (origin + unitRay.Direction * rangeValue)
+                    return CFrame.new(hitPos)
                 end
             end
         end
+        return _oldIndex(self, key)
     end
-    rapidGuns[gun] = true
-end
+    setreadonly(_grm, true)
 
-local function clearRapidGuns()
-    rapidGuns = {}
-end
+    local gunHandlerPatched = false
+    local function patchGunHandler()
+        if gunHandlerPatched then return end
+        task.spawn(function()
+            local modules = G.RS:FindFirstChild("Modules")
+            if not modules then modules = G.RS:WaitForChild("Modules", 10) end
+            if not modules then return end
+            local gunhandler = modules:FindFirstChild("GunHandler")
+            if not gunhandler then gunhandler = modules:WaitForChild("GunHandler", 10) end
+            if not gunhandler then return end
+            local ok, handler = pcall(require, gunhandler)
+            if not ok or type(handler) ~= "table" then return end
 
-local function scanRapid()
-    if not rapidOn then return end
-    local char = G.LP.Character
-    if not char then return end
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool and tool:FindFirstChild("Ammo") and isGunSelected(tool) then  -- <-- FILTER
-        if not rapidGuns[tool] then setupRapid(tool) end
-        if G.U:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-            pcall(tool.Activate, tool)
-        end
+            local function patchShoot(original)
+                if type(original) ~= "function" then return original end
+                return function(t, ...)
+                    if type(t) == "table" and rangeOn then
+                        t.Range = rangeValue
+                        if t.range then t.range = rangeValue end
+                    end
+                    return original(t, ...)
+                end
+            end
+
+            if handler.Shoot then handler.Shoot = patchShoot(handler.Shoot) end
+            if handler.shoot then handler.shoot = patchShoot(handler.shoot) end
+            gunHandlerPatched = true
+        end)
     end
-end
 
--- ============================================
--- REMOVE DELAY + HOLD MODE (FILTERED)
--- ============================================
+    -- ============================================
+    -- RAPID FIRE (SINGLE SYSTEM - FILTERED)
+    -- ============================================
+    local rapidOn = false
+    local rapidGuns = {}
 
-local delayOn = false
-local delayGuns = {}
-local holdActive = false
-local holdConn = nil
-local mouseDownConn = nil
-local mouseUpConn = nil
-local holdDelay = 0.05
-local lastFireTime = 0
-
-local function setupDelay(gun)
-    if delayGuns[gun] then return end
-    if gun.Parent ~= G.LP.Character then return end
-    if not isGunSelected(gun) then return end  -- <-- FILTER
-    
-    local gs = gun:FindFirstChild("GunScript")
-    local fr = gun:FindFirstChild("FireRate") or gun:FindFirstChild("Rate") or gun:FindFirstChild("ShootRate")
-    local cd = gun:FindFirstChild("ShootingCooldown")
-    
-    if gs then
+    local function setupRapid(gun)
+        if rapidGuns[gun] then return end
+        if gun.Parent ~= G.LP.Character then return end
+        if not isGunSelected(gun) then return end
+        
         local conns = getconnections(gun.Activated)
         for _, c in ipairs(conns) do
             local fn = c.Function
@@ -848,294 +779,341 @@ local function setupDelay(gun)
                 local info = debug.getinfo(fn)
                 for i = 1, (info.nups or 0) do
                     local val = debug.getupvalue(fn, i)
-                    if type(val) == "number" and val > 0.05 and val < 1 then
+                    if type(val) == "number" and val > 0 and val < 0.5 then
                         debug.setupvalue(fn, i, 0)
                     end
                 end
             end
         end
+        rapidGuns[gun] = true
     end
-    if fr and fr:IsA("NumberValue") then fr.Value = 0 end
-    if cd and cd:IsA("NumberValue") then cd.Value = 0 end
-    
-    delayGuns[gun] = true
-end
 
-local function clearDelayGuns()
-    delayGuns = {}
-end
+    local function clearRapidGuns()
+        rapidGuns = {}
+    end
 
-local function startHoldMode()
-    if holdConn then return end
-    
-    mouseDownConn = G.U.InputBegan:Connect(function(input, gp)
-        if gp then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            if not delayOn then return end
-            local char = G.LP.Character
-            if not char then return end
-            local tool = char:FindFirstChildOfClass("Tool")
-            if not tool or not tool:FindFirstChild("Ammo") then return end
-            if not isGunSelected(tool) then return end  -- <-- FILTER
-            
-            if not delayGuns[tool] then setupDelay(tool) end
-            holdActive = true
-            lastFireTime = 0
-            
-            if holdConn then holdConn:Disconnect() holdConn = nil end
-            
-            holdConn = G.R.Heartbeat:Connect(function()
-                if not holdActive or not delayOn then
-                    if holdConn then holdConn:Disconnect() holdConn = nil end
-                    return
+    local function scanRapid()
+        if not rapidOn then return end
+        local char = G.LP.Character
+        if not char then return end
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool and tool:FindFirstChild("Ammo") and isGunSelected(tool) then
+            if not rapidGuns[tool] then setupRapid(tool) end
+            if G.U:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                pcall(tool.Activate, tool)
+            end
+        end
+    end
+
+    -- ============================================
+    -- REMOVE DELAY + HOLD MODE (FILTERED)
+    -- ============================================
+    local delayOn = false
+    local delayGuns = {}
+    local holdActive = false
+    local holdConn = nil
+    local mouseDownConn = nil
+    local mouseUpConn = nil
+    local holdDelay = 0.05
+    local lastFireTime = 0
+
+    local function setupDelay(gun)
+        if delayGuns[gun] then return end
+        if gun.Parent ~= G.LP.Character then return end
+        if not isGunSelected(gun) then return end
+        
+        local gs = gun:FindFirstChild("GunScript")
+        local fr = gun:FindFirstChild("FireRate") or gun:FindFirstChild("Rate") or gun:FindFirstChild("ShootRate")
+        local cd = gun:FindFirstChild("ShootingCooldown")
+        
+        if gs then
+            local conns = getconnections(gun.Activated)
+            for _, c in ipairs(conns) do
+                local fn = c.Function
+                if fn then
+                    local info = debug.getinfo(fn)
+                    for i = 1, (info.nups or 0) do
+                        local val = debug.getupvalue(fn, i)
+                        if type(val) == "number" and val > 0.05 and val < 1 then
+                            debug.setupvalue(fn, i, 0)
+                        end
+                    end
                 end
-                local char2 = G.LP.Character
-                if not char2 then holdActive = false return end
-                local tool2 = char2:FindFirstChildOfClass("Tool")
-                if not tool2 or not tool2:FindFirstChild("Ammo") then holdActive = false return end
-                if not isGunSelected(tool2) then  -- <-- FILTER
-                    holdActive = false
-                    return
-                end
+            end
+        end
+        if fr and fr:IsA("NumberValue") then fr.Value = 0 end
+        if cd and cd:IsA("NumberValue") then cd.Value = 0 end
+        
+        delayGuns[gun] = true
+    end
+
+    local function clearDelayGuns()
+        delayGuns = {}
+    end
+
+    local function startHoldMode()
+        if holdConn then return end
+        
+        mouseDownConn = G.U.InputBegan:Connect(function(input, gp)
+            if gp then return end
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                if not delayOn then return end
+                local char = G.LP.Character
+                if not char then return end
+                local tool = char:FindFirstChildOfClass("Tool")
+                if not tool or not tool:FindFirstChild("Ammo") then return end
+                if not isGunSelected(tool) then return end
                 
-                local now = tick()
-                if now - lastFireTime >= holdDelay then
-                    pcall(tool2.Activate, tool2)
-                    lastFireTime = now
-                end
-            end)
-        end
-    end)
-    
-    mouseUpConn = G.U.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            holdActive = false
-            if holdConn then holdConn:Disconnect() holdConn = nil end
-        end
-    end)
-end
-
-local function stopHoldMode()
-    holdActive = false
-    if holdConn then holdConn:Disconnect() holdConn = nil end
-    if mouseDownConn then mouseDownConn:Disconnect() mouseDownConn = nil end
-    if mouseUpConn then mouseUpConn:Disconnect() mouseUpConn = nil end
-end
-
-local function scanDelay()
-    if not delayOn then return end
-    local char = G.LP.Character
-    if not char then return end
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool and tool:FindFirstChild("Ammo") and isGunSelected(tool) then  -- <-- FILTER
-        if not delayGuns[tool] then setupDelay(tool) end
+                if not delayGuns[tool] then setupDelay(tool) end
+                holdActive = true
+                lastFireTime = 0
+                
+                if holdConn then holdConn:Disconnect() holdConn = nil end
+                
+                holdConn = G.R.Heartbeat:Connect(function()
+                    if not holdActive or not delayOn then
+                        if holdConn then holdConn:Disconnect() holdConn = nil end
+                        return
+                    end
+                    local char2 = G.LP.Character
+                    if not char2 then holdActive = false return end
+                    local tool2 = char2:FindFirstChildOfClass("Tool")
+                    if not tool2 or not tool2:FindFirstChild("Ammo") then holdActive = false return end
+                    if not isGunSelected(tool2) then
+                        holdActive = false
+                        return
+                    end
+                    
+                    local now = tick()
+                    if now - lastFireTime >= holdDelay then
+                        pcall(tool2.Activate, tool2)
+                        lastFireTime = now
+                    end
+                end)
+            end
+        end)
+        
+        mouseUpConn = G.U.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                holdActive = false
+                if holdConn then holdConn:Disconnect() holdConn = nil end
+            end
+        end)
     end
-end
 
--- ============================================
--- RENDER LOOP
--- ============================================
+    local function stopHoldMode()
+        holdActive = false
+        if holdConn then holdConn:Disconnect() holdConn = nil end
+        if mouseDownConn then mouseDownConn:Disconnect() mouseDownConn = nil end
+        if mouseUpConn then mouseUpConn:Disconnect() mouseUpConn = nil end
+    end
 
-G.R.RenderStepped:Connect(function()
-    scanRapid()
-    scanDelay()
-end)
-
--- ============================================
--- CHARACTER EVENTS
--- ============================================
-
-G.LP.CharacterAdded:Connect(function()
-    clearRapidGuns()
-    clearDelayGuns()
-    holdActive = false
-    if holdConn then holdConn:Disconnect() holdConn = nil end
-    if rangeOn then patchGunHandler() end
-    task.wait(0.3)
-    if delayOn and f.hold_mode then startHoldMode() end
-end)
-
-if G.LP.Character then
-    G.LP.Character.ChildAdded:Connect(function(child)
-        if child:IsA("Tool") then
-            task.wait(0.15)
-            if rapidOn and child.Parent == G.LP.Character and isGunSelected(child) then  -- <-- FILTER
-                setupRapid(child)
-            end
-            if delayOn and child.Parent == G.LP.Character and isGunSelected(child) then  -- <-- FILTER
-                setupDelay(child)
-            end
+    local function scanDelay()
+        if not delayOn then return end
+        local char = G.LP.Character
+        if not char then return end
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool and tool:FindFirstChild("Ammo") and isGunSelected(tool) then
+            if not delayGuns[tool] then setupDelay(tool) end
         end
+    end
+
+    -- ============================================
+    -- RENDER LOOP
+    -- ============================================
+    G.R.RenderStepped:Connect(function()
+        scanRapid()
+        scanDelay()
     end)
-end
 
--- ============================================
--- UI CONTROLS
--- ============================================
-
-Sections.WeaponsLeft:Dropdown({
-    Name = "modification",
-    Flag = "gun_selector_clean",
-    Items = selectedGuns,
-    Default = {"Revolver"},
-    Multi = true,
-    Callback = function(v)
-        currentSelected = v or {}
-        -- Clear caches when selection changes so guns re-evaluate
+    -- ============================================
+    -- CHARACTER EVENTS
+    -- ============================================
+    G.LP.CharacterAdded:Connect(function()
         clearRapidGuns()
         clearDelayGuns()
-        if delayOn and f.hold_mode then
-            stopHoldMode()
-            task.wait(0.1)
-            startHoldMode()
-        end
-    end
-})
+        holdActive = false
+        if holdConn then holdConn:Disconnect() holdConn = nil end
+        if rangeOn then patchGunHandler() end
+        task.wait(0.3)
+        if delayOn and f.hold_mode then startHoldMode() end
+    end)
 
-Sections.WeaponsLeft:Toggle({
-    Name = "inf range",
-    Flag = "inf_range_clean",
-    Default = false,
-    Callback = function(v)
-        rangeOn = v
-        if v then patchGunHandler() end
+    if G.LP.Character then
+        G.LP.Character.ChildAdded:Connect(function(child)
+            if child:IsA("Tool") then
+                task.wait(0.15)
+                if rapidOn and child.Parent == G.LP.Character and isGunSelected(child) then
+                    setupRapid(child)
+                end
+                if delayOn and child.Parent == G.LP.Character and isGunSelected(child) then
+                    setupDelay(child)
+                end
+            end
+        end)
     end
-})
 
-Sections.WeaponsLeft:Toggle({
-    Name = "rapid fire",
-    Flag = "rapid_fire_clean",
-    Default = false,
-    Callback = function(v)
-        rapidOn = v
-        if not v then clearRapidGuns() end
-    end
-})
-
-Sections.WeaponsLeft:Toggle({
-    Name = "remove delay",
-    Flag = "remove_delay_clean",
-    Default = false,
-    Callback = function(v)
-        delayOn = v
-        if not v then 
+    -- ============================================
+    -- UI CONTROLS
+    -- ============================================
+    Sections.WeaponsLeft:Dropdown({
+        Name = "modification",
+        Flag = "gun_selector_clean",
+        Items = selectedGuns,
+        Default = {"Revolver"},
+        Multi = true,
+        Callback = function(v)
+            currentSelected = v or {}
+            clearRapidGuns()
             clearDelayGuns()
-            stopHoldMode()
-        elseif f.hold_mode then
-            startHoldMode()
+            if delayOn and f.hold_mode then
+                stopHoldMode()
+                task.wait(0.1)
+                startHoldMode()
+            end
         end
-    end
-})
+    })
 
-Sections.WeaponsLeft:Toggle({
-    Name = "hold mode",
-    Flag = "hold_mode",
-    Default = false,
-    Callback = function(v)
-        if v and delayOn then 
-            startHoldMode()
-        else 
-            stopHoldMode()
+    Sections.WeaponsLeft:Toggle({
+        Name = "inf range",
+        Flag = "inf_range_clean",
+        Default = false,
+        Callback = function(v)
+            rangeOn = v
+            if v then patchGunHandler() end
         end
-    end
-})
+    })
 
-Sections.WeaponsLeft:Slider({
-    Name = "hold delay",
-    Flag = "hold_delay",
-    Default = 0.05,
-    Min = 0.001,
-    Max = 0.15,
-    Decimals = 0.001,
-    Callback = function(v)
-        holdDelay = v
-    end
-})
+    Sections.WeaponsLeft:Toggle({
+        Name = "rapid fire",
+        Flag = "rapid_fire_clean",
+        Default = false,
+        Callback = function(v)
+            rapidOn = v
+            if not v then clearRapidGuns() end
+        end
+    })
 
+    Sections.WeaponsLeft:Toggle({
+        Name = "remove delay",
+        Flag = "remove_delay_clean",
+        Default = false,
+        Callback = function(v)
+            delayOn = v
+            if not v then 
+                clearDelayGuns()
+                stopHoldMode()
+            elseif f.hold_mode then
+                startHoldMode()
+            end
+        end
+    })
 
-    
+    Sections.WeaponsLeft:Toggle({
+        Name = "hold mode",
+        Flag = "hold_mode",
+        Default = false,
+        Callback = function(v)
+            if v and delayOn then 
+                startHoldMode()
+            else 
+                stopHoldMode()
+            end
+        end
+    })
 
+    Sections.WeaponsLeft:Slider({
+        Name = "hold delay",
+        Flag = "hold_delay",
+        Default = 0.05,
+        Min = 0.001,
+        Max = 0.15,
+        Decimals = 0.001,
+        Callback = function(v)
+            holdDelay = v
+        end
+    })
     
     -- ============================================
--- ESP (WHITE TEXT)
--- ============================================
-local ESP = {Name=false, Distance=false, Health=false, Tool=false}
-local ESPLabels = {Name={}, Distance={}, Health={}, Tool={}}
-local TargetColor = Color3.fromRGB(255,255,255) -- Changed to white
+    -- ESP (WHITE TEXT)
+    -- ============================================
+    local ESP = {Name=false, Distance=false, Health=false, Tool=false}
+    local ESPLabels = {Name={}, Distance={}, Health={}, Tool={}}
+    local TargetColor = Color3.fromRGB(255,255,255)
 
-local ScreenGui = G.CG:FindFirstChild("ESPGui") or Instance.new("ScreenGui")
-if not ScreenGui.Parent then ScreenGui.Name = "ESPGui" ScreenGui.ResetOnSpawn = false ScreenGui.IgnoreGuiInset = true ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global ScreenGui.Parent = G.CG end
+    local ScreenGui = G.CG:FindFirstChild("ESPGui") or Instance.new("ScreenGui")
+    if not ScreenGui.Parent then ScreenGui.Name = "ESPGui" ScreenGui.ResetOnSpawn = false ScreenGui.IgnoreGuiInset = true ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global ScreenGui.Parent = G.CG end
 
-local function CreateLabel(name)
-    local label = Instance.new("TextLabel")
-    label.Name, label.BackgroundTransparency, label.BorderSizePixel, label.Size, label.AnchorPoint, label.TextColor3, label.TextStrokeColor3, label.TextStrokeTransparency, label.TextSize, label.Font, label.TextXAlignment, label.TextYAlignment, label.Visible, label.ZIndex = name, 1, 0, UDim2.new(0,250,0,18), Vector2.new(0.5,0.5), Color3.fromRGB(255,255,255), Color3.fromRGB(0,0,0), 0, 13, Enum.Font.GothamBold, Enum.TextXAlignment.Center, Enum.TextYAlignment.Center, false, 10
-    label.Parent = ScreenGui
-    return label
-end
-
-local function AddPlayer(p)
-    if p == G.LP then return end
-    ESPLabels.Name[p] = ESPLabels.Name[p] or CreateLabel("Name")
-    ESPLabels.Distance[p] = ESPLabels.Distance[p] or CreateLabel("Distance")
-    ESPLabels.Health[p] = ESPLabels.Health[p] or CreateLabel("Health")
-    ESPLabels.Tool[p] = ESPLabels.Tool[p] or CreateLabel("Tool")
-end
-
-local function RemovePlayer(p)
-    for _, t in pairs(ESPLabels) do if t[p] then t[p]:Destroy() t[p] = nil end end
-end
-
-for _, p in ipairs(G.P:GetPlayers()) do AddPlayer(p) end
-G.P.PlayerAdded:Connect(AddPlayer)
-G.P.PlayerRemoving:Connect(RemovePlayer)
-
-G.R.RenderStepped:Connect(function()
-    G.C = G.W.CurrentCamera
-    if not G.C then return end
-    local stickyTarget = Silent and Silent.Sticky and Silent.Sticky.Enabled and Silent.Sticky.Target
-    for p, nameLabel in pairs(ESPLabels.Name) do
-        local char, head, hum = p.Character, p.Character and p.Character:FindFirstChild("Head"), p.Character and p.Character:FindFirstChildOfClass("Humanoid")
-        if not head or not hum or hum.Health <= 0 then
-            for _, t in pairs(ESPLabels) do if t[p] then t[p].Visible = false end end
-            continue
-        end
-        local headTop = head.Position + Vector3.new(0, head.Size.Y / 2, 0)
-        local screenPos, onScreen = G.C:WorldToViewportPoint(headTop)
-        if not onScreen or screenPos.Z <= 0 then
-            for _, t in pairs(ESPLabels) do if t[p] then t[p].Visible = false end end
-            continue
-        end
-        local x, y, offset, spacing = screenPos.X, screenPos.Y, 8, 15
-        local isTarget = (stickyTarget == p)
-        if ESP.Name then
-            nameLabel.Text, nameLabel.Position = p.DisplayName, UDim2.fromOffset(x, y - offset)
-            nameLabel.TextColor3, nameLabel.TextStrokeColor3 = isTarget and TargetColor or Color3.fromRGB(255,255,255), Color3.fromRGB(0,0,0)
-            nameLabel.TextSize, nameLabel.Visible = 13, true
-            offset = offset + spacing
-        else nameLabel.Visible = false end
-        if ESP.Distance then
-            local dist = math.floor((G.C.CFrame.Position - head.Position).Magnitude)
-            ESPLabels.Distance[p].Text, ESPLabels.Distance[p].Position = "["..dist.."m]", UDim2.fromOffset(x, y - offset)
-            ESPLabels.Distance[p].TextColor3 = isTarget and TargetColor or Color3.fromRGB(255,255,255)
-            ESPLabels.Distance[p].Visible = true
-            offset = offset + spacing
-        else ESPLabels.Distance[p].Visible = false end
-        if ESP.Health then
-            ESPLabels.Health[p].Text, ESPLabels.Health[p].Position = math.floor(hum.Health).." HP", UDim2.fromOffset(x, y - offset)
-            ESPLabels.Health[p].TextColor3 = Color3.fromRGB(255,255,255)
-            ESPLabels.Health[p].Visible = true
-            offset = offset + spacing
-        else ESPLabels.Health[p].Visible = false end
-        if ESP.Tool then
-            local tool = nil
-            if char then for _, obj in ipairs(char:GetChildren()) do if obj:IsA("Tool") then tool = obj break end end end
-            if tool then 
-                ESPLabels.Tool[p].Text, ESPLabels.Tool[p].Position, ESPLabels.Tool[p].Visible = "["..tool.Name.."]", UDim2.fromOffset(x, y - offset), true
-                ESPLabels.Tool[p].TextColor3 = Color3.fromRGB(255,255,255)
-            else ESPLabels.Tool[p].Visible = false end
-        else ESPLabels.Tool[p].Visible = false end
+    local function CreateLabel(name)
+        local label = Instance.new("TextLabel")
+        label.Name, label.BackgroundTransparency, label.BorderSizePixel, label.Size, label.AnchorPoint, label.TextColor3, label.TextStrokeColor3, label.TextStrokeTransparency, label.TextSize, label.Font, label.TextXAlignment, label.TextYAlignment, label.Visible, label.ZIndex = name, 1, 0, UDim2.new(0,250,0,18), Vector2.new(0.5,0.5), Color3.fromRGB(255,255,255), Color3.fromRGB(0,0,0), 0, 13, Enum.Font.GothamBold, Enum.TextXAlignment.Center, Enum.TextYAlignment.Center, false, 10
+        label.Parent = ScreenGui
+        return label
     end
-end)
+
+    local function AddPlayer(p)
+        if p == G.LP then return end
+        ESPLabels.Name[p] = ESPLabels.Name[p] or CreateLabel("Name")
+        ESPLabels.Distance[p] = ESPLabels.Distance[p] or CreateLabel("Distance")
+        ESPLabels.Health[p] = ESPLabels.Health[p] or CreateLabel("Health")
+        ESPLabels.Tool[p] = ESPLabels.Tool[p] or CreateLabel("Tool")
+    end
+
+    local function RemovePlayer(p)
+        for _, t in pairs(ESPLabels) do if t[p] then t[p]:Destroy() t[p] = nil end end
+    end
+
+    for _, p in ipairs(G.P:GetPlayers()) do AddPlayer(p) end
+    G.P.PlayerAdded:Connect(AddPlayer)
+    G.P.PlayerRemoving:Connect(RemovePlayer)
+
+    G.R.RenderStepped:Connect(function()
+        G.C = G.W.CurrentCamera
+        if not G.C then return end
+        local stickyTarget = Silent and Silent.Sticky and Silent.Sticky.Enabled and Silent.Sticky.Target
+        for p, nameLabel in pairs(ESPLabels.Name) do
+            local char, head, hum = p.Character, p.Character and p.Character:FindFirstChild("Head"), p.Character and p.Character:FindFirstChildOfClass("Humanoid")
+            if not head or not hum or hum.Health <= 0 then
+                for _, t in pairs(ESPLabels) do if t[p] then t[p].Visible = false end end
+                continue
+            end
+            local headTop = head.Position + Vector3.new(0, head.Size.Y / 2, 0)
+            local screenPos, onScreen = G.C:WorldToViewportPoint(headTop)
+            if not onScreen or screenPos.Z <= 0 then
+                for _, t in pairs(ESPLabels) do if t[p] then t[p].Visible = false end end
+                continue
+            end
+            local x, y, offset, spacing = screenPos.X, screenPos.Y, 8, 15
+            local isTarget = (stickyTarget == p)
+            if ESP.Name then
+                nameLabel.Text, nameLabel.Position = p.DisplayName, UDim2.fromOffset(x, y - offset)
+                nameLabel.TextColor3, nameLabel.TextStrokeColor3 = isTarget and TargetColor or Color3.fromRGB(255,255,255), Color3.fromRGB(0,0,0)
+                nameLabel.TextSize, nameLabel.Visible = 13, true
+                offset = offset + spacing
+            else nameLabel.Visible = false end
+            if ESP.Distance then
+                local dist = math.floor((G.C.CFrame.Position - head.Position).Magnitude)
+                ESPLabels.Distance[p].Text, ESPLabels.Distance[p].Position = "["..dist.."m]", UDim2.fromOffset(x, y - offset)
+                ESPLabels.Distance[p].TextColor3 = isTarget and TargetColor or Color3.fromRGB(255,255,255)
+                ESPLabels.Distance[p].Visible = true
+                offset = offset + spacing
+            else ESPLabels.Distance[p].Visible = false end
+            if ESP.Health then
+                ESPLabels.Health[p].Text, ESPLabels.Health[p].Position = math.floor(hum.Health).." HP", UDim2.fromOffset(x, y - offset)
+                ESPLabels.Health[p].TextColor3 = Color3.fromRGB(255,255,255)
+                ESPLabels.Health[p].Visible = true
+                offset = offset + spacing
+            else ESPLabels.Health[p].Visible = false end
+            if ESP.Tool then
+                local tool = nil
+                if char then for _, obj in ipairs(char:GetChildren()) do if obj:IsA("Tool") then tool = obj break end end end
+                if tool then 
+                    ESPLabels.Tool[p].Text, ESPLabels.Tool[p].Position, ESPLabels.Tool[p].Visible = "["..tool.Name.."]", UDim2.fromOffset(x, y - offset), true
+                    ESPLabels.Tool[p].TextColor3 = Color3.fromRGB(255,255,255)
+                else ESPLabels.Tool[p].Visible = false end
+            else ESPLabels.Tool[p].Visible = false end
+        end
+    end)
     
     Sections.WorldLeft:Toggle({Name = "name", Flag = "name_esp", Default = false, Callback = function(v) ESP.Name = v end})
     Sections.WorldLeft:Toggle({Name = "distance", Flag = "distance_esp", Default = false, Callback = function(v) ESP.Distance = v end})
@@ -1144,174 +1122,163 @@ end)
     local TargetColorToggle = Sections.WorldLeft:Toggle({Name = "target color", Flag = "target_color_toggle", Default = false})
     TargetColorToggle:Colorpicker({Flag = "target_color", Default = Color3.fromRGB(255,0,0), Alpha = 0, Callback = function(c,a) TargetColor = c end})
     
--- ============================================
--- WATERMARK (FIXED - ZERO GAP + TEXT OUTLINE)
--- ============================================
-local gui = Instance.new("ScreenGui")
-gui.Name, gui.ResetOnSpawn, gui.Parent = "KumaPriv", false, G.LP:WaitForChild("PlayerGui")
+    -- ============================================
+    -- WATERMARK (FIXED - ZERO GAP + TEXT OUTLINE)
+    -- ============================================
+    local gui = Instance.new("ScreenGui")
+    gui.Name, gui.ResetOnSpawn, gui.Parent = "KumaPriv", false, G.LP:WaitForChild("PlayerGui")
 
-local label = Instance.new("TextLabel")
-label.Name, label.AnchorPoint, label.Position, label.Size, label.BackgroundTransparency, label.RichText, label.Text, label.TextSize, label.Font, label.TextXAlignment, label.TextYAlignment, label.Parent = "KumaPrivLabel", Vector2.new(0.5,0.5), UDim2.new(0.5,0,0.80,0), UDim2.new(0,220,0,35), 1, true, '<font color="rgb(255,255,255)">kuma</font><font color="rgb(190,150,255)">.priv</font>', 22, Enum.Font.FredokaOne, Enum.TextXAlignment.Center, Enum.TextYAlignment.Center, gui
+    local label = Instance.new("TextLabel")
+    label.Name, label.AnchorPoint, label.Position, label.Size, label.BackgroundTransparency, label.RichText, label.Text, label.TextSize, label.Font, label.TextXAlignment, label.TextYAlignment, label.Parent = "KumaPrivLabel", Vector2.new(0.5,0.5), UDim2.new(0.5,0,0.80,0), UDim2.new(0,220,0,35), 1, true, '<font color="rgb(255,255,255)">kuma</font><font color="rgb(190,150,255)">.priv</font>', 22, Enum.Font.FredokaOne, Enum.TextXAlignment.Center, Enum.TextYAlignment.Center, gui
 
-local stroke = Instance.new("UIStroke")
-stroke.Color, stroke.Thickness, stroke.Transparency, stroke.Parent = Color3.fromRGB(35,30,45), 1.2, 0.35, label
+    local stroke = Instance.new("UIStroke")
+    stroke.Color, stroke.Thickness, stroke.Transparency, stroke.Parent = Color3.fromRGB(35,30,45), 1.2, 0.35, label
 
-local container = Instance.new("Frame")
-container.Name, container.AnchorPoint, container.Position, container.Size, container.BackgroundTransparency, container.Visible, container.Parent = "HotkeyContainer", Vector2.new(0.5,0), UDim2.new(0.5,0,0.80,35), UDim2.new(0,250,0,0), 1, false, gui
+    local container = Instance.new("Frame")
+    container.Name, container.AnchorPoint, container.Position, container.Size, container.BackgroundTransparency, container.Visible, container.Parent = "HotkeyContainer", Vector2.new(0.5,0), UDim2.new(0.5,0,0.80,35), UDim2.new(0,250,0,0), 1, false, gui
 
--- Store current state
-local lastAimTarget = nil
-local lastSilentTarget = nil
-local lastAimEnabled = false
-local lastSilentEnabled = false
-local lastHealthValue = nil
+    -- Store current state
+    local lastAimTarget = nil
+    local lastSilentTarget = nil
+    local lastAimEnabled = false
+    local lastSilentEnabled = false
+    local lastHealthValue = nil
 
-local function createLabel2(text, col, yOffset, size)
-    local l = Instance.new("TextLabel")
-    l.Size = UDim2.new(0, 250, 0, size or 18)
-    l.BackgroundTransparency = 1
-    l.RichText = true
-    l.Text = text
-    l.TextSize = 13
-    l.Font = Enum.Font.FredokaOne
-    l.TextXAlignment = Enum.TextXAlignment.Center
-    l.TextYAlignment = Enum.TextYAlignment.Center
-    l.TextColor3 = col or Color3.fromRGB(255,255,255)
-    l.Position = UDim2.new(0, 0, 0, yOffset)
-    l.TextTransparency = 0
-    l.Parent = container
-    
-    -- Add thin black outline using TextStroke
-    l.TextStrokeColor3 = Color3.fromRGB(0,0,0)
-    l.TextStrokeTransparency = 0
-    
-    return l
-end
-
-local function getPlayerHealthDisplay(target)
-    if not target or not target.Character then return nil end
-    local c = target.Character
-    local hum = c:FindFirstChildOfClass("Humanoid")
-    if not hum then return nil end
-    
-    local health = math.floor(hum.Health)
-    
-    -- Get armor
-    local armor = 0
-    local be = c:FindFirstChild("BodyEffects")
-    if be then
-        local a = be:FindFirstChild("Armor")
-        if a then armor = a.Value end
+    local function createLabel2(text, col, yOffset, size)
+        local l = Instance.new("TextLabel")
+        l.Size = UDim2.new(0, 250, 0, size or 18)
+        l.BackgroundTransparency = 1
+        l.RichText = true
+        l.Text = text
+        l.TextSize = 13
+        l.Font = Enum.Font.FredokaOne
+        l.TextXAlignment = Enum.TextXAlignment.Center
+        l.TextYAlignment = Enum.TextYAlignment.Center
+        l.TextColor3 = col or Color3.fromRGB(255,255,255)
+        l.Position = UDim2.new(0, 0, 0, yOffset)
+        l.TextTransparency = 0
+        l.Parent = container
+        
+        l.TextStrokeColor3 = Color3.fromRGB(0,0,0)
+        l.TextStrokeTransparency = 0
+        
+        return l
     end
-    
-    -- Format: health 100/200 (health=green, armor=blue)
-    return string.format('health  <font color="rgb(100,255,100)">%d</font>/<font color="rgb(100,200,255)">%d</font>', health, armor)
-end
 
-local function updateWatermark()
-    if not f.watermark_hotkeys then
-        container.Visible = false
-        return
+    local function getPlayerHealthDisplay(target)
+        if not target or not target.Character then return nil end
+        local c = target.Character
+        local hum = c:FindFirstChildOfClass("Humanoid")
+        if not hum then return nil end
+        
+        local health = math.floor(hum.Health)
+        
+        local armor = 0
+        local be = c:FindFirstChild("BodyEffects")
+        if be then
+            local a = be:FindFirstChild("Armor")
+            if a then armor = a.Value end
+        end
+        
+        return string.format('health  <font color="rgb(100,255,100)">%d</font>/<font color="rgb(100,200,255)">%d</font>', health, armor)
     end
-    
-    -- Get current targets
-    local aimTarget = f.aim_assist and AimState.CurrentTarget
-    local silentTarget = Silent.Enabled and Silent.Selected and Silent.Selected ~= G.LP and Silent.Selected
-    
-    -- Determine which target to show health for (prioritize aim assist if active)
-    local healthTarget = aimTarget or silentTarget
-    local healthText = healthTarget and getPlayerHealthDisplay(healthTarget)
-    
-    -- Check if anything changed
-    local aimChanged = (aimTarget ~= lastAimTarget) or (f.aim_assist ~= lastAimEnabled)
-    local silentChanged = (silentTarget ~= lastSilentTarget) or (Silent.Enabled ~= lastSilentEnabled)
-    local healthChanged = (healthText ~= lastHealthValue)
-    
-    if not aimChanged and not silentChanged and not healthChanged and container.Visible then
-        return
-    end
-    
-    -- Update tracking
-    lastAimTarget = aimTarget
-    lastSilentTarget = silentTarget
-    lastAimEnabled = f.aim_assist
-    lastSilentEnabled = Silent.Enabled
-    lastHealthValue = healthText
-    
-    -- Clear old labels
-    for _, v in ipairs(container:GetChildren()) do v:Destroy() end
-    
-    local yOffset = 0
-    local hasAny = false
-    local lineHeight = 18
-    
-    -- AIM ASSIST label
-    if f.aim_assist then
-        local displayName = aimTarget and (aimTarget.DisplayName or aimTarget.Name) or "---"
-        createLabel2(string.format('aim assist  <font color="rgb(200,200,255)">%s</font>', displayName), Color3.fromRGB(255,255,255), yOffset, lineHeight)
-        yOffset = yOffset + lineHeight
-        hasAny = true
-    end
-    
-    -- SILENT AIM label
-    if Silent.Enabled then
-        local displayName = silentTarget and (silentTarget.DisplayName or silentTarget.Name) or "---"
-        createLabel2(string.format('silent aim  <font color="rgb(252, 0, 0)">%s</font>', displayName), Color3.fromRGB(255,255,255), yOffset, lineHeight)
-        yOffset = yOffset + lineHeight
-        hasAny = true
-    end
-    
-    -- SHARED HEALTH
-    if healthText and (aimTarget or silentTarget) then
-        createLabel2(healthText, Color3.fromRGB(255,255,255), yOffset, lineHeight)
-        yOffset = yOffset + lineHeight
-        hasAny = true
-    end
-    
-    if hasAny then
-        container.Visible = true
-        container.Size = UDim2.new(0, 250, 0, yOffset)
-    else
-        container.Visible = false
-    end
-end
 
--- Update when targets change
-G.R.RenderStepped:Connect(function()
-    if f.watermark_hotkeys then
+    local function updateWatermark()
+        if not f.watermark_hotkeys then
+            container.Visible = false
+            return
+        end
+        
         local aimTarget = f.aim_assist and AimState.CurrentTarget
         local silentTarget = Silent.Enabled and Silent.Selected and Silent.Selected ~= G.LP and Silent.Selected
+        
         local healthTarget = aimTarget or silentTarget
         local healthText = healthTarget and getPlayerHealthDisplay(healthTarget)
         
-        if aimTarget ~= lastAimTarget or silentTarget ~= lastSilentTarget or 
-           f.aim_assist ~= lastAimEnabled or Silent.Enabled ~= lastSilentEnabled or
-           healthText ~= lastHealthValue then
-            updateWatermark()
+        local aimChanged = (aimTarget ~= lastAimTarget) or (f.aim_assist ~= lastAimEnabled)
+        local silentChanged = (silentTarget ~= lastSilentTarget) or (Silent.Enabled ~= lastSilentEnabled)
+        local healthChanged = (healthText ~= lastHealthValue)
+        
+        if not aimChanged and not silentChanged and not healthChanged and container.Visible then
+            return
+        end
+        
+        lastAimTarget = aimTarget
+        lastSilentTarget = silentTarget
+        lastAimEnabled = f.aim_assist
+        lastSilentEnabled = Silent.Enabled
+        lastHealthValue = healthText
+        
+        for _, v in ipairs(container:GetChildren()) do v:Destroy() end
+        
+        local yOffset = 0
+        local hasAny = false
+        local lineHeight = 18
+        
+        if f.aim_assist then
+            local displayName = aimTarget and (aimTarget.DisplayName or aimTarget.Name) or "---"
+            createLabel2(string.format('aim assist  <font color="rgb(200,200,255)">%s</font>', displayName), Color3.fromRGB(255,255,255), yOffset, lineHeight)
+            yOffset = yOffset + lineHeight
+            hasAny = true
+        end
+        
+        if Silent.Enabled then
+            local displayName = silentTarget and (silentTarget.DisplayName or silentTarget.Name) or "---"
+            createLabel2(string.format('silent aim  <font color="rgb(252, 0, 0)">%s</font>', displayName), Color3.fromRGB(255,255,255), yOffset, lineHeight)
+            yOffset = yOffset + lineHeight
+            hasAny = true
+        end
+        
+        if healthText and (aimTarget or silentTarget) then
+            createLabel2(healthText, Color3.fromRGB(255,255,255), yOffset, lineHeight)
+            yOffset = yOffset + lineHeight
+            hasAny = true
+        end
+        
+        if hasAny then
+            container.Visible = true
+            container.Size = UDim2.new(0, 250, 0, yOffset)
+        else
+            container.Visible = false
         end
     end
-end)
 
-G.P.PlayerRemoving:Connect(function() if f.watermark_hotkeys then updateWatermark() end end)
-G.P.PlayerAdded:Connect(function(p)
-    p.CharacterAdded:Connect(function() if f.watermark_hotkeys then updateWatermark() end end)
-end)
+    -- Update when targets change
+    G.R.RenderStepped:Connect(function()
+        if f.watermark_hotkeys then
+            local aimTarget = f.aim_assist and AimState.CurrentTarget
+            local silentTarget = Silent.Enabled and Silent.Selected and Silent.Selected ~= G.LP and Silent.Selected
+            local healthTarget = aimTarget or silentTarget
+            local healthText = healthTarget and getPlayerHealthDisplay(healthTarget)
+            
+            if aimTarget ~= lastAimTarget or silentTarget ~= lastSilentTarget or 
+               f.aim_assist ~= lastAimEnabled or Silent.Enabled ~= lastSilentEnabled or
+               healthText ~= lastHealthValue then
+                updateWatermark()
+            end
+        end
+    end)
 
-local wm = Sections.WorldLeft:Toggle({Name = "watermark", Flag = "watermark_hotkeys", Default = false, Callback = function(v)
-    label.Visible = v
-    if not v then
-        container.Visible = false
-        for _, ch in ipairs(container:GetChildren()) do ch:Destroy() end
-        lastAimTarget = nil
-        lastSilentTarget = nil
-        lastHealthValue = nil
-    else
-        updateWatermark()
-    end
-end})
+    G.P.PlayerRemoving:Connect(function() if f.watermark_hotkeys then updateWatermark() end end)
+    G.P.PlayerAdded:Connect(function(p)
+        p.CharacterAdded:Connect(function() if f.watermark_hotkeys then updateWatermark() end end)
+    end)
 
-task.wait(0.5)
-if f.watermark_hotkeys then updateWatermark() end
+    local wm = Sections.WorldLeft:Toggle({Name = "watermark", Flag = "watermark_hotkeys", Default = false, Callback = function(v)
+        label.Visible = v
+        if not v then
+            container.Visible = false
+            for _, ch in ipairs(container:GetChildren()) do ch:Destroy() end
+            lastAimTarget = nil
+            lastSilentTarget = nil
+            lastHealthValue = nil
+        else
+            updateWatermark()
+        end
+    end})
+
+    task.wait(0.5)
+    if f.watermark_hotkeys then updateWatermark() end
     
     -- ============================================
     -- WORLD
@@ -1325,70 +1292,6 @@ if f.watermark_hotkeys then updateWatermark() end
     local FogColorLabel2 = Sections.WorldRight:Label({Name = "fog color"})
     FogColorLabel2:Colorpicker({Name = "fog color", Flag = "fog_color", Default = Color3.fromRGB(255,255,255), Callback = function(c) if f.world_enable then G.L.FogColor = c end end})
     Sections.WorldRight:Slider({Name = "exposure", Flag = "world_exposure", Default = 1, Min = 0, Max = 10, Decimals = 0.01, Callback = function(v) if f.world_enable then G.L.Brightness = v end end})
-    
-    -- ============================================
-    -- ARMOR
-    -- ============================================
-    local Armor = {Enabled = false, Value = 1, Running = false}
-    
-    local function GetRemote()
-        local r = G.RS:FindFirstChild("MainGameEvent", true) or G.RS:FindFirstChild("GameRemotes", true)
-        return r and r:IsA("RemoteEvent") and r or nil
-    end
-    
-    local function GetArmorValue()
-        local char = G.LP.Character
-        if not char then return 0 end
-        local be = char:FindFirstChild("BodyEffects")
-        if be then local armor = be:FindFirstChild("Armor") if armor then return tonumber(armor.Value) or 0 end end
-        for _, v in ipairs(char:GetDescendants()) do
-            if v:IsA("ValueBase") and string.lower(v.Name) == "armor" then return tonumber(v.Value) or 0 end
-        end
-        return 0
-    end
-    
-    local function SetArmor(v)
-        local remote = GetRemote()
-        if remote then pcall(function() remote:FireServer("ChangeSettings", "ArmorSave", v) end) end
-    end
-    
-    local function ResetChar()
-        local char = G.LP.Character
-        if char then local hum = char:FindFirstChildOfClass("Humanoid") if hum then hum.Health = 0 end end
-    end
-    
-    local function ApplyArmor()
-        if not Armor.Enabled or Armor.Running then return end
-        Armor.Running = true
-        local current = GetArmorValue()
-        if current < 200 then
-            local shop = nil
-            for _, v in ipairs(G.W:GetDescendants()) do
-                if v.Name:lower():find("armor") and v:FindFirstChild("ClickDetector") then shop = v break end
-            end
-            if shop then
-                local cd = shop:FindFirstChildWhichIsA("ClickDetector")
-                local part = shop:IsA("BasePart") and shop or shop:FindFirstChildWhichIsA("BasePart")
-                if cd and part then
-                    local hrp = G.LP.Character and G.LP.Character:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        local homeCF = hrp.CFrame
-                        hrp.CFrame = part.CFrame * CFrame.new(0, 2.5, 0)
-                        task.wait(0.1)
-                        pcall(function() cd.MaxActivationDistance = 9e9 fireclickdetector(cd) end)
-                        task.wait(0.2)
-                        hrp.CFrame = homeCF
-                    end
-                end
-            end
-        end
-        SetArmor(Armor.Value)
-        task.wait(0.1)
-        ResetChar()
-        Armor.Running = false
-    end
-    
-    
     
     -- ============================================
     -- WALK
@@ -1421,94 +1324,96 @@ if f.watermark_hotkeys then updateWatermark() end
         if Walk.Type == "slippery" then hum.WalkSpeed = Walk.Speed + 1 hum.WalkSpeed = Walk.Speed - 1 hum.WalkSpeed = Walk.Speed end
     end)
     
--- JUMP POWER - FIXED RESET
-JP={E=false,P=50}
-function UJP()
-    local h=G.LP.Character and G.LP.Character:FindFirstChildOfClass("Humanoid")
-    if h then 
-        h.JumpPower=JP.E and JP.P or 50
-    end
-end
-Sections.MovementLeft:Toggle({Name="jump power",Flag="jump_power",Default=false,Callback=function(v)
-    JP.E=v 
-    UJP()
-end})
-Sections.MovementLeft:Slider({Name="jump power amount",Flag="jump_power_amount",Default=50,Min=0,Max=500,Decimals=1,Callback=function(v)
-    JP.P=v 
-    if JP.E then UJP()end
-end})
-
-G.LP.CharacterAdded:Connect(function(c)
-    task.wait(.2)
-    local h=c:FindFirstChildOfClass("Humanoid")
-    if h then h.JumpPower=JP.E and JP.P or 50 end
-end)
-
-G.R.RenderStepped:Connect(function()
-    if JP.E then
+    -- ============================================
+    -- JUMP POWER - FIXED RESET
+    -- ============================================
+    JP={E=false,P=50}
+    function UJP()
         local h=G.LP.Character and G.LP.Character:FindFirstChildOfClass("Humanoid")
-        if h and h.JumpPower~=JP.P then h.JumpPower=JP.P end
+        if h then 
+            h.JumpPower=JP.E and JP.P or 50
+        end
     end
-end)
+    Sections.MovementLeft:Toggle({Name="jump power",Flag="jump_power",Default=false,Callback=function(v)
+        JP.E=v 
+        UJP()
+    end})
+    Sections.MovementLeft:Slider({Name="jump power amount",Flag="jump_power_amount",Default=50,Min=0,Max=500,Decimals=1,Callback=function(v)
+        JP.P=v 
+        if JP.E then UJP()end
+    end})
+
+    G.LP.CharacterAdded:Connect(function(c)
+        task.wait(.2)
+        local h=c:FindFirstChildOfClass("Humanoid")
+        if h then h.JumpPower=JP.E and JP.P or 50 end
+    end)
+
+    G.R.RenderStepped:Connect(function()
+        if JP.E then
+            local h=G.LP.Character and G.LP.Character:FindFirstChildOfClass("Humanoid")
+            if h and h.JumpPower~=JP.P then h.JumpPower=JP.P end
+        end
+    end)
     
     -- ============================================
--- FLY (FIXED)
--- ============================================
-local Fly = {Enabled = false, Speed = 50, Connection = nil, Keys = {[Enum.KeyCode.W]=false,[Enum.KeyCode.A]=false,[Enum.KeyCode.S]=false,[Enum.KeyCode.D]=false,[Enum.KeyCode.Space]=false,[Enum.KeyCode.LeftControl]=false}}
-
-local function UpdateFlyKey(input, state) if Fly.Keys[input.KeyCode] ~= nil then Fly.Keys[input.KeyCode] = state end end
-G.U.InputBegan:Connect(function(input, gameProcessed) if not gameProcessed then UpdateFlyKey(input, true) end end)
-G.U.InputEnded:Connect(function(input) UpdateFlyKey(input, false) end)
-
-local function StartFly()
-    if Fly.Connection then return end
-    local char = G.LP.Character
-    if char then
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.PlatformStand = true
-            hum.AutoRotate = false
-            hum:ChangeState(Enum.HumanoidStateType.Freefall)
-        end
-    end
-    Fly.Connection = G.R.RenderStepped:Connect(function()
-        if not Fly.Enabled then StopFly() return end
+    -- FLY (FIXED)
+    -- ============================================
+    local Fly = {Enabled = false, Speed = 50, Connection = nil, Keys = {[Enum.KeyCode.W]=false,[Enum.KeyCode.A]=false,[Enum.KeyCode.S]=false,[Enum.KeyCode.D]=false,[Enum.KeyCode.Space]=false,[Enum.KeyCode.LeftControl]=false}}
+    
+    local function UpdateFlyKey(input, state) if Fly.Keys[input.KeyCode] ~= nil then Fly.Keys[input.KeyCode] = state end end
+    G.U.InputBegan:Connect(function(input, gameProcessed) if not gameProcessed then UpdateFlyKey(input, true) end end)
+    G.U.InputEnded:Connect(function(input) UpdateFlyKey(input, false) end)
+    
+    local function StartFly()
+        if Fly.Connection then return end
         local char = G.LP.Character
-        if not char then StopFly() return end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp then StopFly() return end
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hum then StopFly() return end
-        hum:ChangeState(Enum.HumanoidStateType.Freefall)
-        local camCF, forward, right, up = G.C.CFrame, G.C.CFrame.LookVector, G.C.CFrame.RightVector, Vector3.new(0,1,0)
-        local moveVec = Vector3.new(0,0,0)
-        if Fly.Keys[Enum.KeyCode.W] then moveVec = moveVec + forward end
-        if Fly.Keys[Enum.KeyCode.S] then moveVec = moveVec - forward end
-        if Fly.Keys[Enum.KeyCode.A] then moveVec = moveVec - right end
-        if Fly.Keys[Enum.KeyCode.D] then moveVec = moveVec + right end
-        if Fly.Keys[Enum.KeyCode.Space] then moveVec = moveVec + up end
-        if Fly.Keys[Enum.KeyCode.LeftControl] then moveVec = moveVec - up end
-        if moveVec.Magnitude > 0 then moveVec = moveVec.Unit * Fly.Speed end
-        hrp.AssemblyLinearVelocity = moveVec
-    end)
-end
-
-local function StopFly()
-    if Fly.Connection then Fly.Connection:Disconnect() Fly.Connection = nil end
-    local char = G.LP.Character
-    if char then
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.PlatformStand = false
-            hum.AutoRotate = true
-            hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.PlatformStand = true
+                hum.AutoRotate = false
+                hum:ChangeState(Enum.HumanoidStateType.Freefall)
+            end
+        end
+        Fly.Connection = G.R.RenderStepped:Connect(function()
+            if not Fly.Enabled then StopFly() return end
+            local char = G.LP.Character
+            if not char then StopFly() return end
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if not hrp then StopFly() return end
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if not hum then StopFly() return end
+            hum:ChangeState(Enum.HumanoidStateType.Freefall)
+            local camCF, forward, right, up = G.C.CFrame, G.C.CFrame.LookVector, G.C.CFrame.RightVector, Vector3.new(0,1,0)
+            local moveVec = Vector3.new(0,0,0)
+            if Fly.Keys[Enum.KeyCode.W] then moveVec = moveVec + forward end
+            if Fly.Keys[Enum.KeyCode.S] then moveVec = moveVec - forward end
+            if Fly.Keys[Enum.KeyCode.A] then moveVec = moveVec - right end
+            if Fly.Keys[Enum.KeyCode.D] then moveVec = moveVec + right end
+            if Fly.Keys[Enum.KeyCode.Space] then moveVec = moveVec + up end
+            if Fly.Keys[Enum.KeyCode.LeftControl] then moveVec = moveVec - up end
+            if moveVec.Magnitude > 0 then moveVec = moveVec.Unit * Fly.Speed end
+            hrp.AssemblyLinearVelocity = moveVec
+        end)
+    end
+    
+    local function StopFly()
+        if Fly.Connection then Fly.Connection:Disconnect() Fly.Connection = nil end
+        local char = G.LP.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.PlatformStand = false
+                hum.AutoRotate = true
+                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+            end
         end
     end
-end
-
-local FlyToggle = Sections.MovementLeft:Toggle({Name = "fly", Flag = "fly_toggle", Default = false, Callback = function(v) Fly.Enabled = v if v then StartFly() else StopFly() end end})
-FlyToggle:Keybind({Flag = "fly_keybind", Mode = "Toggle", Callback = function(s) Fly.Enabled = s if s then StartFly() else StopFly() end end})
-Sections.MovementLeft:Slider({Name = "fly speed", Flag = "fly_speed", Default = 50, Min = 0, Max = 500, Decimals = 0.01, Callback = function(v) Fly.Speed = v end})
+    
+    local FlyToggle = Sections.MovementLeft:Toggle({Name = "fly", Flag = "fly_toggle", Default = false, Callback = function(v) Fly.Enabled = v if v then StartFly() else StopFly() end end})
+    FlyToggle:Keybind({Flag = "fly_keybind", Mode = "Toggle", Callback = function(s) Fly.Enabled = s if s then StartFly() else StopFly() end end})
+    Sections.MovementLeft:Slider({Name = "fly speed", Flag = "fly_speed", Default = 50, Min = 0, Max = 500, Decimals = 0.01, Callback = function(v) Fly.Speed = v end})
     
     -- ============================================
     -- FREEZE
@@ -1705,8 +1610,6 @@ Sections.MovementLeft:Slider({Name = "fly speed", Flag = "fly_speed", Default = 
             end
         end
     end)
-    
- 
     
     -- ============================================
     -- SPECTATE
